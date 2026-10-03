@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Skripte und Stile nur von der eigenen Herkunft, Verbindungen nur zum Supabase-Projekt.
+       Das Verbindungsziel setzt tools/set-backend.mjs zusammen mit config.js. -->
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; base-uri 'none'; form-action 'none'">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+  <title>Bendito Helferplan</title>
+  <link rel="stylesheet" href="styles.css?v=5.0.0">
+</head>
+<body>
+  <div id="root"><p class="boot">Helferplan wird geladen …</p></div>
+  <noscript><p class="boot">Der Helferplan braucht JavaScript.</p></noscript>
+  <script src="vendor/preact.umd.js"></script>
+  <script src="vendor/hooks.umd.js"></script>
+  <script src="vendor/htm.umd.js"></script>
+  <script src="vendor/supabase.js"></script>
+  <script src="config.js?v=5.0.0"></script>
+  <script src="app.js?v=5.0.0"></script>
+</body>
+</html>
