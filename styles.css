@@ -53,6 +53,12 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 .notice.info { background: #EEF6F1; color: #1F5A40; border: 1px solid #B7D8C7; }
 .notice.warn { background: #FFF4DE; color: #6B4300; border: 1px solid #E8CF9B; }
 .notice > span { flex: 1; }
+/* Meldungen und der Hinweis „keine Verbindung“ kleben unten am Bildschirm, damit
+   sie auch dann zu sehen sind, wenn weit nach unten gescrollt wurde. */
+.toasts { position: fixed; left: 0; right: 0; bottom: 0; z-index: 300; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 0 12px calc(12px + env(safe-area-inset-bottom, 0px)); pointer-events: none; }
+.toasts .toast { pointer-events: auto; margin: 0; width: 100%; max-width: 640px; box-shadow: 0 6px 24px rgba(0,0,0,0.18); }
+.notice.toast.err { background: #FBE9E7; }
+.notice.toast.info { background: #EEF6F1; }
 .notice button { background: none; border: 1px solid currentColor; color: inherit; border-radius: 6px; font-size: 12px; font-weight: 600; padding: 4px 10px; min-height: 32px; flex-shrink: 0; }
 
 /* NAV */
@@ -106,6 +112,11 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 .person .rm:hover span { background: rgba(0,0,0,0.32); }
 .card-swap-in { margin-top: 6px; padding: 6px 8px; background: var(--purple-bg); border: 1px solid var(--purple-light); border-radius: 6px; font-size: 11px; color: var(--purple-dark); }
 .card-swap-in strong { font-weight: 700; }
+.card-swap-out { margin-top: 6px; padding: 6px 8px; background: var(--gold-bg); border: 1px solid var(--gold-light); border-radius: 6px; font-size: 11px; color: var(--gold-dark); font-weight: 600; }
+.card-night { display: block; font-size: 10px; font-weight: 700; color: var(--purple-dark); letter-spacing: 0.02em; margin-top: 3px; }
+.ps-swap { font-size: 11px; font-weight: 600; color: var(--gold-dark); margin-top: 2px; }
+.plan-tip { font-size: 12px; color: var(--text2); margin-top: 16px; }
+.footer-link { background: none; border: none; padding: 0; font: inherit; color: inherit; text-decoration: underline; cursor: pointer; min-height: 0; }
 .slots { position: relative; }
 .slot-row { display: flex; flex-wrap: wrap; gap: 6px; }
 .hbar-wrap { position: sticky; top: 0; z-index: 100; }
@@ -188,8 +199,10 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 .plan-free { font-size: 12px; color: var(--text2); font-style: italic; padding-left: 4px; }
 
 /* OVERLAY & DIALOG */
-.overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4); z-index: 200; display: flex; align-items: center; justify-content: center; padding: 12px; }
-.popup { background: #fff; border: 1px solid var(--border2); border-radius: 14px; padding: 26px; width: 480px; max-width: 100%; max-height: 88vh; overflow-y: auto; position: relative; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+.overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.4); z-index: 200; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 12px; }
+.popup { background: #fff; border: 1px solid var(--border2); border-radius: 14px; padding: 26px; width: 480px; max-width: 100%; max-height: 88vh; min-height: 0; flex: 0 1 auto; overflow-y: auto; position: relative; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+/* Meldungen unter einem offenen Dialog: im Fluss, der Dialog macht ihnen Platz. */
+.overlay .toasts { position: static; padding: 0; width: 480px; max-width: 100%; flex: 0 0 auto; pointer-events: auto; }
 .popup h3 { font-size: 18px; margin-bottom: 4px; padding-right: 44px; }
 .popup-x { position: absolute; top: 6px; right: 6px; width: 44px; height: 44px; background: none; border: none; color: var(--text2); font-size: 24px; line-height: 1; border-radius: 8px; }
 .popup-x:hover { color: var(--text); background: var(--surface2); }
@@ -285,7 +298,8 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 .ptable th { background: var(--surface2); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; }
 .ptable .open { color: var(--red); font-weight: 700; }
 
-.footer { padding: 18px 28px 28px; font-size: 11px; color: var(--text2); text-align: center; }
+/* Unten bleibt Platz, damit eine Meldung am Bildschirmrand nichts dauerhaft verdeckt. */
+.footer { padding: 18px 28px 96px; font-size: 11px; color: var(--text2); text-align: center; }
 
 @media (max-width: 768px) {
   .header, .board, .h-overview, .swap-list, .settings, .howto, .my-plan, .inbox, .print-view, .status, .footer { padding-left: 14px; padding-right: 14px; }
@@ -306,9 +320,10 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
   .person { min-height: 44px; }
   .card-ty { min-height: 44px; padding: 12px 0; margin-top: 0; }
   .status .status-btn, .notice button { min-height: 44px; }
+  .footer-link { min-height: 44px; padding: 0 8px; }
 }
 @media print {
-  .header, .status, .notice, .nav, .tabs, .hbar, .assign-hint, .slots, .rm, .swap-btn, .footer, .no-print, .overlay { display: none !important; }
+  .header, .status, .notice, .toasts, .nav, .tabs, .hbar, .assign-hint, .slots, .rm, .swap-btn, .footer, .no-print, .overlay { display: none !important; }
   body { background: #fff; }
   .card, .ptable tr { break-inside: avoid; }
   .print-view { padding: 0; max-width: none; }

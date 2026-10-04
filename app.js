@@ -63,6 +63,7 @@
     SWAP_LOCKED: 'Der Tausch ist gesperrt. Bitte wende dich direkt an die Orga.',
     SWAP_NOT_ALLOWED: 'Diesen Tausch kannst du nicht ausführen. Es wurde nichts geändert.',
     SWAP_EXISTS: 'Diese Anfrage hast du schon gestellt.',
+    SWAP_TOO_MANY: 'Du hast schon fünf offene Anfragen. Zieh eine zurück oder warte auf eine Antwort.',
     SHIFT_FULL: 'Die Schicht ist schon voll besetzt.',
     ASSIGN_DUPLICATE: 'Diese Person ist in der Schicht schon eingeteilt.',
     HELPER_INACTIVE: 'Dieser Helfer ist deaktiviert.',
@@ -96,7 +97,14 @@
     if (isNaN(d.getTime())) return '';
     return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()) + 'T' + p2(d.getHours()) + ':' + p2(d.getMinutes());
   }
+  // „2026-11-15“ → „15.11.2026“. Alles andere ergibt einen leeren Text.
+  function fmtDay(s) { var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(s || '')); return m ? m[3] + '.' + m[2] + '.' + m[1] : ''; }
   function overlaps(a, b) { return a.start_min < b.end_min && b.start_min < a.end_min; }
+  // Schichten vor 06:00 gehören zum Vorabend, liegen aber schon am Folgetag.
+  var NEXT_SH = {fri: 'Sa', sat: 'So', sun: 'Mo'};
+  function isNight(s) { return !!s && s.start_time < '06:00'; }
+  function nightNote(s) { return isNight(s) ? 'Nacht auf ' + (NEXT_SH[s.day] || '') : ''; }
+  function dayShort(s) { return dayOf(s.day).sh + (isNight(s) ? '/' + (NEXT_SH[s.day] || '') : ''); }
 
   function loadPrefs() {
     try { var p = JSON.parse(localStorage.getItem('hp-prefs')); if (p && typeof p === 'object') return p; } catch (e) {}
@@ -121,16 +129,28 @@
   }
 
   // Ruft eine hp_-Funktion auf. Erfolg: die Antwort. Fehler: {kind: 'net' | 'denied' | 'error'}.
-  function rpc(name, args) {
+  function rpcOnce(name, args) {
     var ctrl = new AbortController();
     var timer = setTimeout(function () { ctrl.abort(); }, RPC_TIMEOUT_MS);
     return sb.rpc(name, args || {}).abortSignal(ctrl.signal).then(function (res) {
       clearTimeout(timer);
-      if (res.error) throw classify(res.error, res.status);
+      if (res.error) { var c = classify(res.error, res.status); c.status = res.status; throw c; }
       return res.data;
     }, function (e) {
       clearTimeout(timer);
       throw {kind: 'net', message: String((e && e.message) || e)};
+    });
+  }
+  // Antwortet der Server mit 401, ist das Zugriffstoken abgelaufen und die Anfrage
+  // wurde nicht ausgeführt. Dann die Sitzung einmal erneuern und wiederholen. Das
+  // passiert vor allem, wenn das Telefon lange im Hintergrund war.
+  function rpc(name, args) {
+    return rpcOnce(name, args).catch(function (e) {
+      if (!e || e.status !== 401) throw e;
+      return sb.auth.refreshSession().then(function (r) {
+        if (r.error || !r.data || !r.data.session) throw e;
+        return rpcOnce(name, args);
+      }, function () { throw e; });
     });
   }
 
@@ -156,6 +176,9 @@
 
   // ===== Dialog: Fokus hinein, Tab bleibt im Dialog, Escape schließt, Fokus zurück =====
   var dialogSeq = 0;
+  // Ist ein Dialog offen, stehen die Meldungen direkt unter ihm statt am Bildschirmrand,
+  // damit sie auf kleinen Bildschirmen keine Knöpfe verdecken. Die App legt sie hier ab.
+  var toastSlot = null;
   function Dialog(props) {
     var ref = useRef(null);
     var closeRef = useRef(props.onClose);
@@ -182,6 +205,11 @@
         if (prev && prev.focus && document.contains(prev)) prev.focus();
       };
     }, []);
+    // Wird der gerade gedrückte Knopf gesperrt, fällt der Fokus aus dem Dialog. Zurückholen.
+    useEffect(function () {
+      var el = ref.current;
+      if (el && (!document.activeElement || document.activeElement === document.body)) el.focus();
+    });
     return html`
       <div class="overlay" onMouseDown=${function (e) { if (e.target === e.currentTarget) closeRef.current(); }}>
         <div class="popup" role="dialog" aria-modal="true" aria-labelledby=${idRef.current} tabindex="-1" ref=${ref}>
@@ -189,6 +217,7 @@
           <h3 id=${idRef.current}>${props.title}</h3>
           ${props.children}
         </div>
+        ${toastSlot}
       </div>`;
   }
 
@@ -214,7 +243,7 @@
       var clash = mine.some(function (m) { return overlaps(s, m); });
       var free = s.capacity - inIt.length;
       var who = inIt.map(function (hid) { return (d.hById[hid] || {}).display_name || '?'; }).join(', ');
-      var label = s.start_time + ' ' + gst(s.type_key).n + (free > 0 ? ' · freier Platz' : ' · mit ' + who) + (clash ? ' · überschneidet sich' : '');
+      var label = s.start_time + (isNight(s) ? ' (' + nightNote(s) + ')' : '') + ' ' + gst(s.type_key).n + (free > 0 ? ' · freier Platz' : ' · mit ' + who) + (clash ? ' · überschneidet sich' : '');
       return html`<option key=${s.id} value=${s.id} disabled=${clash}>${label}</option>`;
     }
     var groups = DAYS.map(function (day) {
@@ -225,7 +254,7 @@
     var isMove = t ? (d.byShift[t.id] || []).length < t.capacity : false;
     return html`
       <${Dialog} title="Tausch anfragen" onClose=${props.onClose}>
-        <p class="dlg-p">Du gibst ab: <strong>${dayOf(from.day).sh} ${from.start_time} ${gst(from.type_key).n}</strong></p>
+        <p class="dlg-p">Du gibst ab: <strong>${dayShort(from)} ${from.start_time} ${gst(from.type_key).n}</strong></p>
         <div class="field">
           <label for="swap-target">Dafür möchtest du</label>
           <select id="swap-target" value=${target} onChange=${function (e) { setTarget(e.target.value); }}>
@@ -465,7 +494,7 @@
       if (!v.name.trim()) return;
       act('hp_admin_upsert_helper', {p_id: null, p_name: v.name, p_color: v.color, p_contact: v.contact, p_setup: v.setup, p_target: null, p_is_test: v.test}, {
         okText: 'Helfer angelegt.',
-        onOk: function () { setAdd(function (p) { return Object.assign({}, p, {name: ''}); }); }
+        onOk: function () { setAdd(function (p) { return Object.assign({}, p, {name: '', test: false}); }); }
       });
     }
     function addMany() {
@@ -478,7 +507,7 @@
           if (r.skipped && r.skipped.length) t += ' Übersprungen (doppelt oder ungültig): ' + r.skipped.join(', ') + '.';
           return t;
         },
-        onOk: function () { setBulk(function (p) { return Object.assign({}, p, {text: ''}); }); }
+        onOk: function () { setBulk(function (p) { return Object.assign({}, p, {text: '', test: false}); }); }
       });
     }
     return html`<div>
@@ -585,10 +614,17 @@
       return w.kind === 'swap' && w.from_helper !== d.me && (d.byShift[w.to_shift] || []).indexOf(d.me) !== -1;
     }) : [];
     d.pendingMoves = d.pending.filter(function (w) { return w.kind === 'move'; });
+    // Eigene offene Anfragen je abgegebener Schicht, für die Markierung im Plan.
+    d.myPendingFrom = {};
+    d.mySwaps.forEach(function (w) {
+      if (w.status === 'pending') (d.myPendingFrom[w.from_shift] = d.myPendingFrom[w.from_shift] || []).push(w);
+    });
+    d.serverNow = new Date(snap.ctx.server_time);
+    if (isNaN(d.serverNow.getTime())) d.serverNow = new Date();
     return d;
   }
   function nameOf(d, id) { var h = d.hById[id]; return h ? h.display_name : 'jemand'; }
-  function shiftText(d, id) { var s = d.sById[id]; return s ? dayOf(s.day).sh + ' ' + s.start_time + ' ' + gst(s.type_key).n : '?'; }
+  function shiftText(d, id) { var s = d.sById[id]; return s ? dayShort(s) + ' ' + s.start_time + ' ' + gst(s.type_key).n : '?'; }
   var STATUS_TXT = {pending: 'Offen', accepted: 'Angenommen', rejected: 'Abgelehnt', cancelled: 'Zurückgezogen', expired: 'Verfallen'};
 
   function buildExport(d) {
@@ -636,31 +672,37 @@
     var [dd, setDd] = useState(null);       // offene Auswahlliste einer Schicht
     var [dlg, setDlg] = useState(null);     // offener Dialog
     var [htOpen, setHtOpen] = useState(null);
-    var live = useRef({connOk: true, busy: false, loading: null});
+    var live = useRef({connOk: true, busy: false, loading: null, seq: 0});
     live.current.connOk = conn.ok;
 
     function setView(v) { setViewRaw(v); prefs.view = v; savePrefs(prefs); }
     function setDay(v) { setDayRaw(v); prefs.day = v; savePrefs(prefs); }
 
     function kick(msg) {
-      live.current.loading = null;
+      live.current.loading = null; live.current.seq++;
       setSnap(null); setDlg(null); setSel(null); setNotice(null);
       setLoginMsg(msg || '');
       setPhase('login');
       if (sb) sb.auth.signOut({scope: 'local'}).catch(function () {});
     }
 
-    function refresh() {
-      if (live.current.loading) return live.current.loading;
+    // Lädt den Plan. Läuft schon ein Abruf, wird er mitbenutzt – außer nach einer
+    // eigenen Änderung (force): Dann zählt nur ein Abruf, der danach gestartet ist.
+    // Das Ergebnis eines überholten Abrufs wird verworfen.
+    function refresh(force) {
+      if (live.current.loading && !force) return live.current.loading;
+      var seq = ++live.current.seq;
       var p = rpc('hp_state').then(function (data) {
+        if (seq !== live.current.seq) return true;
         setSnap(data);
         setConn({ok: true, at: new Date()});
         return true;
       }, function (e) {
+        if (seq !== live.current.seq) return false;
         if (e.kind === 'denied') { kick('Dieser Zugang ist nicht mehr gültig. Bitte hol dir bei der Orga einen neuen Link.'); return false; }
         setConn(function (c) { return {ok: false, at: c.at}; });
         return false;
-      }).then(function (ok) { live.current.loading = null; return ok; });
+      }).then(function (ok) { if (seq === live.current.seq) live.current.loading = null; return ok; });
       live.current.loading = p;
       return p;
     }
@@ -721,7 +763,7 @@
       // Wird der persönliche Link in einem Tab geöffnet, in dem die App schon läuft,
       // ändert sich nur der #-Teil und die Seite lädt nicht neu.
       function onHash() {
-        if (/^#k=/.test(location.hash || '')) { setSnap(null); setDlg(null); setSel(null); setNotice(null); start(); }
+        if (/^#k=/.test(location.hash || '')) { live.current.loading = null; live.current.seq++; setSnap(null); setDlg(null); setSel(null); setNotice(null); start(); }
       }
       window.addEventListener('hashchange', onHash);
       return function () {
@@ -756,6 +798,13 @@
       return function () { document.removeEventListener('keydown', onKey); };
     }, []);
 
+    // Erfolgsmeldungen verschwinden von selbst, Fehler bleiben, bis sie geschlossen werden.
+    useEffect(function () {
+      if (!notice || notice.type !== 'info') return;
+      var t = setTimeout(function () { setNotice(function (cur) { return cur === notice ? null : cur; }); }, 9000);
+      return function () { clearTimeout(t); };
+    }, [notice]);
+
     var d = useMemo(function () { return snap ? derive(snap) : null; }, [snap]);
 
     // Hinweise gelten als gelesen, sobald die Ansicht offen ist.
@@ -788,20 +837,24 @@
         return null;
       }).then(function (data) {
         live.current.busy = false; setBusy(false);
-        return refresh().then(function () { return data; });
+        return refresh(true).then(function () { return data; });
       });
     }
 
     function adminLogin(email, pw) {
       return sb.auth.signInWithPassword({email: email, password: pw}).then(function (res) {
         if (res.error) {
-          return /fetch|network/i.test(res.error.message || '') ? 'Keine Verbindung. Bitte später erneut versuchen.' : 'E-Mail oder Passwort stimmt nicht.';
+          var st = res.error.status || 0;
+          if (st === 429) return 'Zu viele Anmeldeversuche. Bitte ein paar Minuten warten.';
+          if (!st || st >= 500 || /fetch|network/i.test(res.error.message || '')) return 'Der Helferplan ist gerade nicht erreichbar. Bitte später erneut versuchen.';
+          return 'E-Mail oder Passwort stimmt nicht.';
         }
         return firstLoad().then(function (msg) { return msg === 'offline' ? null : msg; });
       }, function () { return 'Keine Verbindung. Bitte später erneut versuchen.'; });
     }
 
     function logout() {
+      live.current.loading = null; live.current.seq++;
       setSnap(null); setDlg(null); setSel(null); setNotice(null); setLoginMsg('');
       setPhase('login');
       sb.auth.signOut({scope: 'local'}).catch(function () {});
@@ -837,11 +890,33 @@
       if (sel) assign(shiftId, sel, false);
       else setDd(dd === shiftId ? null : shiftId);
     }
-    function unassign(shiftId, helperId) { act('hp_admin_unassign', {p_shift: shiftId, p_helper: helperId}); }
+    // Die App meldet Helfern nicht, wenn die Orga etwas ändert. Deshalb erinnert die
+    // Rückmeldung daran, und vor dem Entfernen wird gewarnt, wenn ein Tausch daran hängt.
+    function unassign(shiftId, helperId) {
+      var who = nameOf(d, helperId), where = shiftText(d, shiftId);
+      var touched = d.pending.filter(function (w) {
+        return (w.from_helper === helperId && w.from_shift === shiftId) || (w.kind === 'swap' && w.to_shift === shiftId && w.from_helper !== helperId);
+      });
+      var go = function () {
+        setDlg(null);
+        act('hp_admin_unassign', {p_shift: shiftId, p_helper: helperId}, {
+          okText: who + ' ist aus ' + where + ' entfernt. Sag der Person kurz Bescheid: Änderungen durch die Orga meldet die App nicht.'
+        });
+      };
+      if (touched.length) {
+        setDlg({type: 'confirm', title: 'Offene Tauschanfrage', yes: 'Trotzdem entfernen', onYes: go,
+          text: 'An der Zuweisung von ' + who + ' in ' + where + ' hängt eine offene Tauschanfrage. Wenn du die Person entfernst, kann die Anfrage verfallen.'});
+      } else go();
+    }
     function requestSwap(fromId, toId, note) {
       setDlg(null);
+      var others = (d.byShift[toId] || []).filter(function (id) { return id !== me; }).map(function (id) { return nameOf(d, id); }).join(' oder ');
       act('hp_swap_request', {p_from_shift: fromId, p_to_shift: toId, p_note: note}, {
-        okText: function (r) { return r.kind === 'move' ? 'Anfrage gesendet. Die Orga gibt den Wechsel frei.' : 'Anfrage gesendet. Du siehst die Antwort unter „Mein Tausch“.'; }
+        okText: function (r) {
+          return r.kind === 'move'
+            ? 'Anfrage gesendet. Die Orga gibt den Wechsel frei. Sag der Orga kurz Bescheid, die App schickt keine Nachricht aufs Telefon.'
+            : 'Anfrage gesendet. Sag ' + (others || 'der Person') + ' kurz Bescheid, die App schickt keine Nachricht aufs Telefon. Die Antwort siehst du unter „Mein Tausch“.';
+        }
       });
     }
     function askAccept(w) {
@@ -901,6 +976,7 @@
       var suffix = dupes.length > 1 ? ' ' + 'ABCDEFGH'.charAt(dupes.indexOf(shift.id)) : '';
       var title = st.n + suffix;
       var incoming = d.pending.filter(function (w) { return w.to_shift === shift.id; });
+      var myOut = isMine ? (d.myPendingFrom[shift.id] || []) : [];
       var slotBtns = [];
       for (var i = 0; i < slots; i++) {
         slotBtns.push(html`<button key=${i} type="button" class=${'slot' + (sel ? ' ready' : '')} disabled=${off}
@@ -924,7 +1000,7 @@
       return html`<div key=${shift.id} class=${'card ' + cls + (isMine ? ' mine' : '')} data-shift=${shift.id}>
         <div class="card-top">
           <div>
-            <div class="card-tm">${shift.start_time}</div>
+            <div class="card-tm">${shift.start_time}${isNight(shift) ? html`<span class="card-night">${nightNote(shift)}</span>` : null}</div>
             <button type="button" class="card-ty" aria-label=${'Infos zu ' + title} onClick=${function (e) { e.stopPropagation(); setDlg({type: 'info', key: shift.type_key, min: shift.duration_min}); }}>${title} · ${hrs(shift.duration_min)} h</button>
           </div>
           <span class=${'cap ' + cls} aria-label=${inIt.length + ' von ' + shift.capacity + ' besetzt'}>${inIt.length}/${shift.capacity}</span>
@@ -943,6 +1019,7 @@
         <div class="card-swaps">${incoming.map(function (w) {
           return html`<div class="card-swap-in" key=${w.id}><strong>${nameOf(d, w.from_helper)}</strong> möchte hierher ${w.kind === 'move' ? 'wechseln' : 'tauschen'}</div>`;
         })}</div>
+        ${myOut.length ? html`<div class="card-swap-out">Deine Anfrage läuft: ${myOut.map(function (w) { return shiftText(d, w.to_shift); }).join(', ')}${locked ? ' (Tausch gesperrt)' : ''}</div>` : null}
         ${isAdmin && !full ? html`<div class="slots"><div class="slot-row">${slotBtns}</div>${ddList}</div>` : null}
         ${isHelper && isMine ? (locked
           ? html`<div class="free-txt">Tausch ist gesperrt</div>`
@@ -1017,13 +1094,15 @@
                   <div class="ps-time">${x.start_time}</div>
                   <div class="ps-info">
                     <div class="ps-type">${gst(x.type_key).n}</div>
-                    <div class="ps-dur">${hrs(x.duration_min)} Stunden</div>
+                    <div class="ps-dur">${hrs(x.duration_min)} Stunden${isNight(x) ? ' · ' + nightNote(x) : ''}</div>
+                    ${(d.myPendingFrom[x.id] || []).length ? html`<div class="ps-swap">Tausch angefragt: ${d.myPendingFrom[x.id].map(function (w) { return shiftText(d, w.to_shift); }).join(', ')}</div>` : null}
                   </div>
                   ${locked ? null : html`<button type="button" class="swap-btn" disabled=${off} onClick=${function () { setDlg({type: 'swap', shiftId: x.id}); }}>Tausch</button>`}
                 </div>`;
               })}</div>
             </div>`;
           })}</div>
+          <p class="plan-tip">Tipp: Mach vor dem Wochenende ein Bildschirmfoto von deinem Plan. Dann hast du ihn auch ohne Netz.</p>
         </div>`;
     }
 
@@ -1036,7 +1115,7 @@
     }
     function statusEl(w) {
       var txt = STATUS_TXT[w.status] || w.status;
-      if (w.status === 'pending') txt = w.kind === 'move' ? 'Wartet auf die Orga' : 'Wartet auf Antwort';
+      if (w.status === 'pending') txt = locked ? 'Offen, Tausch gesperrt' : (w.kind === 'move' ? 'Wartet auf die Orga' : 'Wartet auf Antwort');
       if (w.status === 'accepted' && w.kind === 'move') txt = 'Freigegeben';
       return html`<span class=${'sw-status st-' + w.status}>${txt}</span>`;
     }
@@ -1165,7 +1244,8 @@
 
     // ----- Einstellungen (Orga) -----
     function renderSettings() {
-      var hasTest = d.allHelpers.some(function (h) { return h.is_test; });
+      var testNames = d.allHelpers.filter(function (h) { return h.is_test; }).map(function (h) { return h.display_name; });
+      var hasTest = testNames.length > 0;
       var hasLogins = d.allHelpers.some(function (h) { return h.has_login; });
       return html`
         <div class="settings">
@@ -1212,10 +1292,10 @@
           </div>
           <div class="s-block">
             <h3>Testdaten und Löschung</h3>
-            <div class="s-note">Löschtermin laut Einstellung: ${String(d.settings.purge_after || '').split('-').reverse().join('.')}. Vorher den Plan als Datei sichern.</div>
+            <div class="s-note">Löschtermin laut Einstellung: ${fmtDay(d.settings.purge_after) || 'nicht gesetzt'}. Vorher den Plan als Datei sichern.</div>
             <div class="btn-row">
               <button type="button" class="btn btn-ghost" disabled=${off || !hasTest} onClick=${function () {
-                setDlg({type: 'confirm', danger: true, title: 'Testdaten entfernen?', text: 'Entfernt alle Testhelfer samt Zuweisungen, Tausch und Login-Links. Echte Helfer bleiben unberührt.', yes: 'Testdaten entfernen',
+                setDlg({type: 'confirm', danger: true, title: 'Testdaten entfernen?', text: 'Entfernt ' + testNames.length + ' Testhelfer samt Zuweisungen, Tausch und Login-Links: ' + testNames.join(', ') + '. Alle anderen Helfer bleiben unberührt.', yes: 'Testdaten entfernen',
                   onYes: function () { setDlg(null); act('hp_admin_remove_test_data', {}, {okText: function (r) { return r.removed + ' Testhelfer entfernt.'; }}); }});
               }}>Testdaten entfernen</button>
               <button type="button" class="btn btn-ghost" disabled=${off || !hasLogins} onClick=${function () {
@@ -1250,7 +1330,7 @@
                 <tbody>${list.map(function (s) {
                   var names = (d.byShift[s.id] || []).map(function (id) { return nameOf(d, id); });
                   var open = s.capacity - names.length;
-                  return html`<tr key=${s.id}><td>${s.start_time}</td><td>${gst(s.type_key).n}</td><td>${hrs(s.duration_min)} h</td>
+                  return html`<tr key=${s.id}><td>${s.start_time}${isNight(s) ? ' (' + nightNote(s) + ')' : ''}</td><td>${gst(s.type_key).n}</td><td>${hrs(s.duration_min)} h</td>
                     <td>${names.join(', ')}${open > 0 ? html`<span class="open">${names.length ? ' · ' : ''}${open} offen</span>` : null}</td></tr>`;
                 })}</tbody>
               </table></section>`;
@@ -1286,10 +1366,28 @@
         return html`<${HelperForm} helper=${dlg.helper} disabled=${off} onClose=${close}
           onSubmit=${function (args) { act('hp_admin_upsert_helper', args, {okText: 'Gespeichert.', onOk: close}); }} />`;
       }
+      if (dlg.type === 'privacy') {
+        var until = fmtDay(d.settings.purge_after);
+        return html`<${Dialog} title="Datenschutz" onClose=${close}>
+          <p class="dlg-p"><strong>Was gespeichert wird:</strong> dein Anzeigename, eine Farbe, dein bevorzugter Kontaktweg (ohne Nummer oder Adresse), ob du zum Aufbau-Team gehörst, deine Schichten und deine Tauschanfragen samt Notiz.</p>
+          <p class="dlg-p"><strong>Wer es sieht:</strong> Name, Farbe, Kontaktweg, Aufbau-Team und Schichten sehen alle Helfer mit persönlichem Link und die Orga. Tauschanfragen sehen nur die Beteiligten und die Orga.</p>
+          <p class="dlg-p"><strong>Technisch dazu:</strong> ein Protokoll ohne Namen, wann welche Aktion lief. Beim Öffnen eines Links wird für etwa einen Tag eine Prüfsumme der Internetadresse gespeichert, um Ausprobieren zu bremsen. Die Adresse selbst wird nicht gespeichert.</p>
+          <p class="dlg-p"><strong>Wo es liegt:</strong> in einer Datenbank beim Dienst Supabase. Die Seite selbst kommt von GitHub Pages.</p>
+          <p class="dlg-p"><strong>Auf deinem Gerät:</strong> nur deine Anmeldung und zwei Anzeige-Einstellungen. Keine Statistik, keine Werbung.</p>
+          <p class="dlg-p"><strong>Löschung:</strong> Nach dem Event werden die Login-Links gesperrt und die Helferdaten${until ? ' bis zum ' + until : ''} aus der App gelöscht. Die Orga sichert den Plan vorher als Datei auf ihrem eigenen Gerät.</p>
+          <p class="dlg-p">Fragen, Auskunft oder Löschwunsch: bitte direkt an die Orga.</p>
+          <div class="dlg-actions"><button type="button" class="btn btn-ghost" data-autofocus="1" onClick=${close}>Schließen</button></div>
+        <//>`;
+      }
       if (dlg.type === 'link') return html`<${LinkDialog} name=${dlg.name} url=${dlg.url} onClose=${close} />`;
       if (dlg.type === 'purge') {
         return html`<${PurgeDialog} disabled=${off} onExport=${doExport} onClose=${close}
-          onPurge=${function () { setDlg(null); act('hp_admin_purge', {p_confirm: 'LOESCHEN'}, {okText: function (r) { return 'Gelöscht: ' + r.helpers + ' Helfer, ' + r.assignments + ' Zuweisungen, ' + r.swaps + ' Tauschvorgänge.'; }}); }} />`;
+          onPurge=${function () { setDlg(null); act('hp_admin_purge', {p_confirm: 'LOESCHEN'}, {
+            okText: function (r) { return 'Gelöscht: ' + r.helpers + ' Helfer, ' + r.assignments + ' Zuweisungen, ' + r.swaps + ' Tauschvorgänge.'; },
+            onOk: function (r) {
+              if (r.auth_left > 0) setNotice({type: 'err', text: 'Die Helferdaten sind gelöscht, aber ' + r.auth_left + ' Anmeldekonten ließen sich nicht entfernen. Bitte im Supabase-Dashboard unter „Authentication“ die Konten mit der Adresse hp-…@helfer.bendito.invalid von Hand löschen.'});
+            }
+          }); }} />`;
       }
       if (dlg.type === 'helper') {
         var h = d.hById[dlg.id];
@@ -1315,7 +1413,7 @@
               <div class="pop-dn">${day2.name}</div>
               ${list.length === 0 ? html`<div class="pop-free">—</div>` : null}
               <div>${list.map(function (x) {
-                return html`<div class="pop-sh" key=${x.id}>${x.start_time} — ${gst(x.type_key).n} (${hrs(x.duration_min)} h)</div>`;
+                return html`<div class="pop-sh" key=${x.id}>${x.start_time}${isNight(x) ? ' (' + nightNote(x) + ')' : ''} — ${gst(x.type_key).n} (${hrs(x.duration_min)} h)</div>`;
               })}</div>
             </div>`;
           })}</div>
@@ -1345,6 +1443,29 @@
     else if (cur === 'inbox') body = renderInbox();
     else if (cur === 'print') body = renderPrint();
 
+    // Erinnerung für die Orga nach dem Event.
+    var reminder = null;
+    if (isAdmin && d.allHelpers.length > 0) {
+      var purgeTxt = fmtDay(d.settings.purge_after) || 'laut Einstellung';
+      var purgeDue = !!fmtDay(d.settings.purge_after) && d.serverNow >= new Date(d.settings.purge_after + 'T00:00:00');
+      var eventOver = d.settings.event_end && d.serverNow > new Date(d.settings.event_end);
+      var linksOpen = d.allHelpers.some(function (h) { return h.has_login; });
+      if (purgeDue) reminder = 'Der Löschtermin (' + purgeTxt + ') ist erreicht. Bitte den Plan als Datei sichern und danach die Helferdaten löschen.';
+      else if (eventOver && linksOpen) reminder = 'Das Event ist vorbei. Bitte alle Login-Links sperren und bis zum ' + purgeTxt + ' die Helferdaten löschen.';
+      else if (eventOver) reminder = 'Das Event ist vorbei. Bitte bis zum ' + purgeTxt + ' den Plan als Datei sichern und die Helferdaten löschen.';
+    }
+
+    // Meldungen: am Bildschirmrand, oder direkt unter einem offenen Dialog.
+    var toastStack = html`<div class="toasts">
+      ${conn.ok ? null : html`<div class="notice err toast" data-toast="conn">
+        <span>Keine Verbindung. Du siehst den Stand von ${conn.at ? fmtClock(conn.at) : 'vorhin'}, Änderungen sind gesperrt.</span>
+        <button type="button" onClick=${function () { refresh(); }}>Erneut versuchen</button></div>`}
+      ${notice ? html`<div class=${'notice toast ' + notice.type} data-toast="notice" role=${notice.type === 'err' ? 'alert' : 'status'}>
+        <span>${notice.text}</span><button type="button" onClick=${function () { setNotice(null); }}>Schließen</button></div>` : null}
+    </div>`;
+    toastSlot = (!conn.ok || notice) ? toastStack : null;
+    var dialogEl = renderDialog();
+
     var meHelper = me ? d.hById[me] : null;
     var statusText = conn.ok
       ? 'Stand ' + (conn.at ? fmtClock(conn.at) : '–')
@@ -1368,9 +1489,8 @@
           <span class="dot" aria-hidden="true"></span><span>${statusText}</span>
           ${conn.ok ? null : html`<button type="button" class="status-btn" onClick=${function () { refresh(); }}>Erneut versuchen</button>`}
         </div>
-        ${notice ? html`<div class=${'notice ' + notice.type} role=${notice.type === 'err' ? 'alert' : 'status'}>
-          <span>${notice.text}</span><button type="button" onClick=${function () { setNotice(null); }}>Schließen</button>
-        </div>` : null}
+        ${reminder ? html`<div class="notice warn" data-reminder="1"><span>${reminder}</span>
+          ${cur === 'settings' ? null : html`<button type="button" onClick=${function () { setView('settings'); }}>Zu den Einstellungen</button>`}</div>` : null}
         <nav class="nav" aria-label="Tage">
           ${DAYS.map(function (x) {
             var ds = d.dayStats[x.id];
@@ -1388,12 +1508,23 @@
           })}
         </nav>
         <main key=${cur}>${body}</main>
-        ${renderDialog()}
-        <footer class="footer">Bendito Helferplan · Version ${VERSION}</footer>
+        ${dialogEl}
+        <footer class="footer">Bendito Helferplan · Version ${VERSION} · <button type="button" class="footer-link" onClick=${function () { setDlg({type: 'privacy'}); }}>Datenschutz</button></footer>
+        ${dialogEl ? null : toastStack}
       </div>`;
   }
 
   var rootEl = document.getElementById('root');
   rootEl.textContent = '';   // Ladehinweis aus index.html entfernen
+  // Nicht in fremden Seiten eingebettet laufen (Schutz gegen untergeschobene Klicks).
+  var framed = false;
+  try { framed = window.top !== window.self; } catch (e) { framed = true; }
+  if (framed) {
+    var p = document.createElement('p');
+    p.className = 'boot';
+    p.textContent = 'Der Helferplan lässt sich nicht eingebettet öffnen. Bitte die Adresse direkt aufrufen.';
+    rootEl.appendChild(p);
+    return;
+  }
   Pr(Ph(App), rootEl);
 })();
