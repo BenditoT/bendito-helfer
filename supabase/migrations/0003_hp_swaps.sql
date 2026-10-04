@@ -5,16 +5,18 @@
 --         Annehmen kann jede dort eingeteilte Person.
 --   move  Wechsel auf einen freien Platz. Gibt nur die Orga frei.
 --
+-- Je Person sind höchstens fünf offene Anfragen gleichzeitig möglich.
+--
 -- hp_swap_accept ändert den Plan entweder vollständig oder gar nicht. Alle
 -- Vorbedingungen werden unmittelbar vor der Änderung neu geprüft, während
--- hp__touch() die Planänderungen aller Sitzungen in eine Reihe zwingt.
+-- hp_private.touch() die Planänderungen aller Sitzungen in eine Reihe zwingt.
 
 create or replace function public.hp_swap_request(p_from_shift text, p_to_shift text, p_note text)
 returns jsonb
 language plpgsql security definer set search_path = ''
 as $$
 declare
-  v_me uuid := public.hp__helper_id();
+  v_me uuid := hp_private.helper_id();
   v_to public.hp_shifts;
   v_n int;
   v_kind text;
@@ -25,33 +27,37 @@ begin
   if v_me is null then
     raise exception 'NOT_ALLOWED' using errcode = '42501';
   end if;
-  perform public.hp__touch();
+  perform hp_private.touch();
 
-  if public.hp__locked() then
-    return public.hp__fail('swap_request', p_from_shift, v_me, 'SWAP_LOCKED');
+  if hp_private.locked() then
+    return hp_private.fail('swap_request', p_from_shift, v_me, 'SWAP_LOCKED');
   end if;
   if p_from_shift is null or p_to_shift is null or p_from_shift = p_to_shift then
-    return public.hp__fail('swap_request', p_from_shift, v_me, 'SWAP_NOT_ALLOWED');
+    return hp_private.fail('swap_request', p_from_shift, v_me, 'SWAP_NOT_ALLOWED');
   end if;
   select * into v_to from public.hp_shifts where id = p_to_shift;
   if not found then
-    return public.hp__fail('swap_request', p_from_shift, v_me, 'NOT_FOUND');
+    return hp_private.fail('swap_request', p_from_shift, v_me, 'NOT_FOUND');
   end if;
   if not exists (select 1 from public.hp_assignments a where a.shift_id = p_from_shift and a.helper_id = v_me) then
-    return public.hp__fail('swap_request', p_from_shift, v_me, 'SWAP_NOT_ALLOWED');
+    return hp_private.fail('swap_request', p_from_shift, v_me, 'SWAP_NOT_ALLOWED');
   end if;
   if exists (select 1 from public.hp_assignments a where a.shift_id = p_to_shift and a.helper_id = v_me) then
-    return public.hp__fail('swap_request', p_from_shift, v_me, 'SWAP_NOT_ALLOWED');
+    return hp_private.fail('swap_request', p_from_shift, v_me, 'SWAP_NOT_ALLOWED');
   end if;
-  if public.hp__conflict(v_me, p_to_shift, p_from_shift) is not null then
-    return public.hp__fail('swap_request', p_from_shift, v_me, 'SWAP_OVERLAP');
+  if hp_private.conflict(v_me, p_to_shift, p_from_shift) is not null then
+    return hp_private.fail('swap_request', p_from_shift, v_me, 'SWAP_OVERLAP');
   end if;
   if exists (
     select 1 from public.hp_swaps w
     where w.status = 'pending' and w.from_helper = v_me
       and w.from_shift = p_from_shift and w.to_shift = p_to_shift
   ) then
-    return public.hp__fail('swap_request', p_from_shift, v_me, 'SWAP_EXISTS');
+    return hp_private.fail('swap_request', p_from_shift, v_me, 'SWAP_EXISTS');
+  end if;
+  if (select count(*) from public.hp_swaps w
+      where w.status = 'pending' and w.from_helper = v_me) >= 5 then
+    return hp_private.fail('swap_request', p_from_shift, v_me, 'SWAP_TOO_MANY');
   end if;
 
   select count(*) into v_n from public.hp_assignments a where a.shift_id = p_to_shift;
@@ -64,11 +70,11 @@ begin
   if v_kind = 'swap' then
     for r in select a.helper_id from public.hp_assignments a where a.shift_id = p_to_shift and a.helper_id <> v_me
     loop
-      perform public.hp__notify(r.helper_id, 'swap_request', v_id);
+      perform hp_private.notify(r.helper_id, 'swap_request', v_id);
     end loop;
   end if;
 
-  perform public.hp__audit('swap_request:' || v_kind, p_from_shift, v_me, 'ok');
+  perform hp_private.audit('swap_request:' || v_kind, p_from_shift, v_me, 'ok');
   return jsonb_build_object('ok', true, 'id', v_id, 'kind', v_kind);
 end;
 $$;
@@ -78,8 +84,8 @@ returns jsonb
 language plpgsql security definer set search_path = ''
 as $$
 declare
-  v_admin boolean := public.hp__is_admin();
-  v_me uuid := public.hp__helper_id();
+  v_admin boolean := hp_private.is_admin();
+  v_me uuid := hp_private.helper_id();
   v_sw public.hp_swaps;
   v_to public.hp_shifts;
   v_a uuid;
@@ -90,20 +96,20 @@ begin
     raise exception 'NOT_ALLOWED' using errcode = '42501';
   end if;
   -- Reiht diesen Aufruf hinter alle laufenden Planänderungen ein.
-  perform public.hp__touch();
+  perform hp_private.touch();
 
   select * into v_sw from public.hp_swaps where id = p_swap for update;
   if not found then
-    return public.hp__fail('swap_accept', null, v_me, 'NOT_FOUND');
+    return hp_private.fail('swap_accept', null, v_me, 'NOT_FOUND');
   end if;
   v_a := v_sw.from_helper;
 
   -- 1. Vorgang offen, Tausch nicht gesperrt.
   if v_sw.status <> 'pending' then
-    return public.hp__fail('swap_accept', v_sw.from_shift, v_a, 'SWAP_STALE');
+    return hp_private.fail('swap_accept', v_sw.from_shift, v_a, 'SWAP_STALE');
   end if;
-  if public.hp__locked() then
-    return public.hp__fail('swap_accept', v_sw.from_shift, v_a, 'SWAP_LOCKED');
+  if hp_private.locked() then
+    return hp_private.fail('swap_accept', v_sw.from_shift, v_a, 'SWAP_LOCKED');
   end if;
 
   -- Wer darf diesen Vorgang annehmen?
@@ -111,11 +117,11 @@ begin
     if v_admin or v_me is null or v_me = v_a
        or not exists (select 1 from public.hp_assignments a
                       where a.shift_id = v_sw.to_shift and a.helper_id = v_me) then
-      return public.hp__fail('swap_accept', v_sw.from_shift, v_a, 'SWAP_NOT_ALLOWED');
+      return hp_private.fail('swap_accept', v_sw.from_shift, v_a, 'SWAP_NOT_ALLOWED');
     end if;
   else
     if not v_admin then
-      return public.hp__fail('swap_accept', v_sw.from_shift, v_a, 'SWAP_NOT_ALLOWED');
+      return hp_private.fail('swap_accept', v_sw.from_shift, v_a, 'SWAP_NOT_ALLOWED');
     end if;
   end if;
 
@@ -125,28 +131,28 @@ begin
                     where a.shift_id = v_sw.from_shift and a.helper_id = v_a)
      or exists (select 1 from public.hp_assignments a
                 where a.shift_id = v_sw.to_shift and a.helper_id = v_a) then
-    return public.hp__fail('swap_accept', v_sw.from_shift, v_a, 'SWAP_STALE');
+    return hp_private.fail('swap_accept', v_sw.from_shift, v_a, 'SWAP_STALE');
   end if;
 
   if v_sw.kind = 'swap' then
     -- 3. Annehmender ist nicht schon in der Ausgangsschicht; keine Überschneidungen.
     if exists (select 1 from public.hp_assignments a
                where a.shift_id = v_sw.from_shift and a.helper_id = v_me) then
-      return public.hp__fail('swap_accept', v_sw.from_shift, v_a, 'SWAP_NOT_ALLOWED');
+      return hp_private.fail('swap_accept', v_sw.from_shift, v_a, 'SWAP_NOT_ALLOWED');
     end if;
-    if public.hp__conflict(v_me, v_sw.from_shift, v_sw.to_shift) is not null
-       or public.hp__conflict(v_a, v_sw.to_shift, v_sw.from_shift) is not null then
-      return public.hp__fail('swap_accept', v_sw.from_shift, v_a, 'SWAP_OVERLAP');
+    if hp_private.conflict(v_me, v_sw.from_shift, v_sw.to_shift) is not null
+       or hp_private.conflict(v_a, v_sw.to_shift, v_sw.from_shift) is not null then
+      return hp_private.fail('swap_accept', v_sw.from_shift, v_a, 'SWAP_OVERLAP');
     end if;
   else
     -- 4. Freier Platz in der Zielschicht, keine Überschneidung beim Anfragenden.
     select * into v_to from public.hp_shifts where id = v_sw.to_shift;
     select count(*) into v_n from public.hp_assignments a where a.shift_id = v_sw.to_shift;
     if v_n >= v_to.capacity then
-      return public.hp__fail('swap_accept', v_sw.from_shift, v_a, 'SWAP_STALE');
+      return hp_private.fail('swap_accept', v_sw.from_shift, v_a, 'SWAP_STALE');
     end if;
-    if public.hp__conflict(v_a, v_sw.to_shift, v_sw.from_shift) is not null then
-      return public.hp__fail('swap_accept', v_sw.from_shift, v_a, 'SWAP_OVERLAP');
+    if hp_private.conflict(v_a, v_sw.to_shift, v_sw.from_shift) is not null then
+      return hp_private.fail('swap_accept', v_sw.from_shift, v_a, 'SWAP_OVERLAP');
     end if;
   end if;
 
@@ -181,16 +187,16 @@ begin
       )
   loop
     update public.hp_swaps w set status = 'expired', resolved_at = now() where w.id = r.id;
-    perform public.hp__notify(r.from_helper, 'swap_expired', r.id);
+    perform hp_private.notify(r.from_helper, 'swap_expired', r.id);
   end loop;
-  perform public.hp__sweep();
+  perform hp_private.sweep();
 
   -- 7. Benachrichtigungen und Protokoll.
-  perform public.hp__notify(v_a, 'swap_accepted', v_sw.id);
+  perform hp_private.notify(v_a, 'swap_accepted', v_sw.id);
   if v_sw.kind = 'swap' then
-    perform public.hp__notify(v_me, 'swap_accepted', v_sw.id);
+    perform hp_private.notify(v_me, 'swap_accepted', v_sw.id);
   end if;
-  perform public.hp__audit('swap_accept:' || v_sw.kind, v_sw.from_shift, v_a, 'ok');
+  perform hp_private.audit('swap_accept:' || v_sw.kind, v_sw.from_shift, v_a, 'ok');
   return jsonb_build_object('ok', true, 'kind', v_sw.kind);
 end;
 $$;
@@ -202,21 +208,21 @@ returns jsonb
 language plpgsql security definer set search_path = ''
 as $$
 declare
-  v_admin boolean := public.hp__is_admin();
-  v_me uuid := public.hp__helper_id();
+  v_admin boolean := hp_private.is_admin();
+  v_me uuid := hp_private.helper_id();
   v_sw public.hp_swaps;
 begin
   if not v_admin and v_me is null then
     raise exception 'NOT_ALLOWED' using errcode = '42501';
   end if;
-  perform public.hp__touch();
+  perform hp_private.touch();
 
   select * into v_sw from public.hp_swaps where id = p_swap for update;
   if not found then
-    return public.hp__fail('swap_reject', null, v_me, 'NOT_FOUND');
+    return hp_private.fail('swap_reject', null, v_me, 'NOT_FOUND');
   end if;
   if v_sw.status <> 'pending' then
-    return public.hp__fail('swap_reject', v_sw.from_shift, v_sw.from_helper, 'SWAP_STALE');
+    return hp_private.fail('swap_reject', v_sw.from_shift, v_sw.from_helper, 'SWAP_STALE');
   end if;
   if not v_admin and (
        v_sw.kind <> 'swap'
@@ -224,14 +230,14 @@ begin
        or not exists (select 1 from public.hp_assignments a
                       where a.shift_id = v_sw.to_shift and a.helper_id = v_me)
      ) then
-    return public.hp__fail('swap_reject', v_sw.from_shift, v_sw.from_helper, 'SWAP_NOT_ALLOWED');
+    return hp_private.fail('swap_reject', v_sw.from_shift, v_sw.from_helper, 'SWAP_NOT_ALLOWED');
   end if;
 
   update public.hp_swaps w
      set status = 'rejected', resolved_by = (select auth.uid()), resolved_at = now()
    where w.id = v_sw.id;
-  perform public.hp__notify(v_sw.from_helper, 'swap_rejected', v_sw.id);
-  perform public.hp__audit('swap_reject:' || v_sw.kind, v_sw.from_shift, v_sw.from_helper, 'ok');
+  perform hp_private.notify(v_sw.from_helper, 'swap_rejected', v_sw.id);
+  perform hp_private.audit('swap_reject:' || v_sw.kind, v_sw.from_shift, v_sw.from_helper, 'ok');
   return jsonb_build_object('ok', true);
 end;
 $$;
@@ -242,30 +248,30 @@ returns jsonb
 language plpgsql security definer set search_path = ''
 as $$
 declare
-  v_admin boolean := public.hp__is_admin();
-  v_me uuid := public.hp__helper_id();
+  v_admin boolean := hp_private.is_admin();
+  v_me uuid := hp_private.helper_id();
   v_sw public.hp_swaps;
 begin
   if not v_admin and v_me is null then
     raise exception 'NOT_ALLOWED' using errcode = '42501';
   end if;
-  perform public.hp__touch();
+  perform hp_private.touch();
 
   select * into v_sw from public.hp_swaps where id = p_swap for update;
   if not found then
-    return public.hp__fail('swap_cancel', null, v_me, 'NOT_FOUND');
+    return hp_private.fail('swap_cancel', null, v_me, 'NOT_FOUND');
   end if;
   if v_sw.status <> 'pending' then
-    return public.hp__fail('swap_cancel', v_sw.from_shift, v_sw.from_helper, 'SWAP_STALE');
+    return hp_private.fail('swap_cancel', v_sw.from_shift, v_sw.from_helper, 'SWAP_STALE');
   end if;
   if not v_admin and v_me is distinct from v_sw.from_helper then
-    return public.hp__fail('swap_cancel', v_sw.from_shift, v_sw.from_helper, 'SWAP_NOT_ALLOWED');
+    return hp_private.fail('swap_cancel', v_sw.from_shift, v_sw.from_helper, 'SWAP_NOT_ALLOWED');
   end if;
 
   update public.hp_swaps w
      set status = 'cancelled', resolved_by = (select auth.uid()), resolved_at = now()
    where w.id = v_sw.id;
-  perform public.hp__audit('swap_cancel:' || v_sw.kind, v_sw.from_shift, v_sw.from_helper, 'ok');
+  perform hp_private.audit('swap_cancel:' || v_sw.kind, v_sw.from_shift, v_sw.from_helper, 'ok');
   return jsonb_build_object('ok', true);
 end;
 $$;

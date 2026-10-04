@@ -1,4 +1,4 @@
--- Tauschtests T1–T10 (Sprint 3.4), dazu drei Zusatzfälle (T5b, T6b, T10b).
+-- Tauschtests T1–T10 (Sprint 3.4), dazu vier Zusatzfälle (T5b, T6b, T10b, T11).
 --
 -- Läuft mit synthetischen Daten. Jeder Fall wird einzeln zurückgerollt, am Ende
 -- bricht der Block mit dem Ergebnis ab und rollt damit auch die Testdaten
@@ -25,12 +25,12 @@ declare
   v_after text;
 begin
   -- ------------------------------------------------------------ Testdaten
-  insert into auth.users (id, email) values
-    (u_admin, 'hp-test-admin-' || u_admin || '@helfer.bendito.invalid'),
-    (u_a, 'hp-' || u_a || '@helfer.bendito.invalid'),
-    (u_b, 'hp-' || u_b || '@helfer.bendito.invalid'),
-    (u_c, 'hp-' || u_c || '@helfer.bendito.invalid'),
-    (u_d, 'hp-' || u_d || '@helfer.bendito.invalid');
+  insert into auth.users (id, email, raw_app_meta_data, created_at) values
+    (u_admin, 'hp-test-admin-' || u_admin || '@helfer.bendito.invalid', '{"hp": "helper"}', now()),
+    (u_a, 'hp-' || u_a || '@helfer.bendito.invalid', '{"hp": "helper"}', now()),
+    (u_b, 'hp-' || u_b || '@helfer.bendito.invalid', '{"hp": "helper"}', now()),
+    (u_c, 'hp-' || u_c || '@helfer.bendito.invalid', '{"hp": "helper"}', now()),
+    (u_d, 'hp-' || u_d || '@helfer.bendito.invalid', '{"hp": "helper"}', now());
   insert into public.hp_admins (user_id) values (u_admin);
   insert into public.hp_helpers (display_name, is_test, auth_user_id) values ('Test Anna T', true, u_a) returning id into h_a;
   insert into public.hp_helpers (display_name, is_test, auth_user_id) values ('Test Ben T', true, u_b) returning id into h_b;
@@ -270,7 +270,7 @@ begin
     -- Sperre über den Zeitpunkt statt über den Schalter.
     perform set_config('request.jwt.claims', jsonb_build_object('sub', u_admin, 'role', 'authenticated')::text, true);
     perform public.hp_admin_set_setting('swaps_locked', 'false'::jsonb);
-    perform public.hp_admin_set_setting('swaps_lock_at', to_jsonb((now() - interval '1 minute')::text));
+    perform public.hp_admin_set_setting('swaps_lock_at', to_jsonb(to_char((now() - interval '1 minute') at time zone 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')));
     perform set_config('request.jwt.claims', jsonb_build_object('sub', u_b, 'role', 'authenticated')::text, true);
     r := public.hp_swap_accept(s1);
     assert r ->> 'code' = 'SWAP_LOCKED', 'Annahme nach Sperrzeitpunkt: ' || r::text;
@@ -356,6 +356,35 @@ begin
     when sqlstate 'HPT00' then res := res || jsonb_build_object('t', 'T10b', 'ok', true);
     when assert_failure then res := res || jsonb_build_object('t', 'T10b', 'ok', false, 'err', sqlerrm);
     when others then res := res || jsonb_build_object('t', 'T10b', 'ok', false, 'err', sqlerrm);
+  end;
+
+  -- ------------------------------------------------------------ T11: höchstens fünf offene Anfragen je Person
+  begin
+    perform set_config('request.jwt.claims', jsonb_build_object('sub', u_a, 'role', 'authenticated')::text, true);
+    r := public.hp_swap_request('zt1', 'zt2', '');
+    s1 := (r ->> 'id')::bigint;
+    assert (r ->> 'ok')::boolean, 'erste Anfrage: ' || r::text;
+    assert (public.hp_swap_request('zt1', 'zt3', '') ->> 'ok')::boolean, 'zweite Anfrage';
+    assert (public.hp_swap_request('zt1', 'zt4', '') ->> 'ok')::boolean, 'dritte Anfrage';
+    assert (public.hp_swap_request('zt1', 'zt5', '') ->> 'ok')::boolean, 'vierte Anfrage';
+    assert (public.hp_swap_request('zt1', 'zt6', '') ->> 'ok')::boolean, 'fünfte Anfrage';
+    r := public.hp_swap_request('zt1', 'zt7', '');
+    assert r ->> 'code' = 'SWAP_TOO_MANY', 'sechste Anfrage: ' || r::text;
+    assert (select count(*) from public.hp_swaps where from_helper = h_a) = 5, 'sechste Anfrage gespeichert';
+    assert not exists (select 1 from public.hp_swaps where to_shift = 'zt7'), 'Vorgang trotz Ablehnung angelegt';
+    -- Eine andere Person ist davon nicht betroffen.
+    perform set_config('request.jwt.claims', jsonb_build_object('sub', u_b, 'role', 'authenticated')::text, true);
+    assert (public.hp_swap_request('zt2', 'zt3', '') ->> 'ok')::boolean, 'Anfrage einer anderen Person';
+    -- Nach dem Zurückziehen ist wieder Platz.
+    perform set_config('request.jwt.claims', jsonb_build_object('sub', u_a, 'role', 'authenticated')::text, true);
+    assert (public.hp_swap_cancel(s1) ->> 'ok')::boolean, 'Zurückziehen';
+    r := public.hp_swap_request('zt1', 'zt7', '');
+    assert (r ->> 'ok')::boolean, 'Anfrage nach dem Zurückziehen: ' || r::text;
+    raise exception using errcode = 'HPT00';
+  exception
+    when sqlstate 'HPT00' then res := res || jsonb_build_object('t', 'T11', 'ok', true);
+    when assert_failure then res := res || jsonb_build_object('t', 'T11', 'ok', false, 'err', sqlerrm);
+    when others then res := res || jsonb_build_object('t', 'T11', 'ok', false, 'err', sqlerrm);
   end;
 
   raise exception 'HP_TEST_RESULTS %', res::text;

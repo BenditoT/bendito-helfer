@@ -6,16 +6,33 @@
 //
 // Regeln:
 //   * Unbekannter und widerrufener Code bekommen dieselbe Antwort (401 "invalid").
-//   * Höchstens 10 Fehlversuche je Absender in 10 Minuten, danach 429.
+//   * Ein gültiger Code kommt immer durch. Fehlversuche sind je Absender auf
+//     10 in 10 Minuten begrenzt, danach 429.
 //   * Ins Log gelangen weder Codes noch Namen noch Adressen.
+//
+// Bereitstellen mit verify_jwt = false (siehe supabase/config.toml): Die
+// Funktion ist der Login selbst und prüft den Code. Mit eingeschalteter
+// JWT-Prüfung würde das Gateway Aufrufe mit einem publishable-Schlüssel
+// (sb_publishable_…) abweisen, bevor die Funktion läuft.
+//
+// Erlaubte Herkünfte: die Pages-Adresse, dazu optional eine kommagetrennte Liste
+// in der Umgebungsvariable HP_ALLOWED_ORIGINS (zum Beispiel bei einem Umzug auf
+// eine eigene Domain). Die Herkunftsprüfung ist Bequemlichkeit für den Browser,
+// kein Schutz: Der Schutz ist der Code.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const PAGES_ORIGIN = "https://benditot.github.io";
 const HELPER_DOMAIN = "helfer.bendito.invalid";
 
+function allowedOrigins(): string[] {
+  const extra = (Deno.env.get("HP_ALLOWED_ORIGINS") ?? "")
+    .split(",").map((o) => o.trim().replace(/\/+$/, "")).filter((o) => /^https:\/\/[a-z0-9.-]+(:\d+)?$/.test(o));
+  return [PAGES_ORIGIN, ...extra];
+}
+
 function allowedOrigin(origin: string | null): string {
-  if (origin && (origin === PAGES_ORIGIN || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin))) {
+  if (origin && (allowedOrigins().includes(origin) || /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin))) {
     return origin;
   }
   return PAGES_ORIGIN;
@@ -70,7 +87,10 @@ Deno.serve(async (req: Request) => {
   }
 
   // Der Absender wird nur als Schlüssel-Hash gespeichert, nie als Adresse.
-  const ip = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || "unbekannt";
+  // Bevorzugt die Adresse, die der vorgeschaltete Dienst selbst setzt; x-forwarded-for
+  // kann ein Aufrufer mitschicken und taugt nur als letzte Möglichkeit.
+  const ip = (req.headers.get("cf-connecting-ip") ?? req.headers.get("x-real-ip")
+    ?? (req.headers.get("x-forwarded-for") ?? "").split(",")[0]).trim() || "unbekannt";
   const ipHash = (await hmacHex(serviceKey, "hp-login:" + ip)).slice(0, 32);
   const codeHash = /^[0-9a-f]{64}$/.test(code)
     ? await sha256Hex(code)

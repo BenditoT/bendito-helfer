@@ -3,6 +3,14 @@
 -- oder beschreiben: RLS ist aktiv, die einzige Policy verweigert alles, und die
 -- Tabellenrechte von anon und authenticated sind entzogen. Gelesen und geändert
 -- wird ausschließlich über die Funktionen aus 0002 bis 0004.
+--
+-- Interne Hilfsfunktionen liegen im Schema hp_private. Dieses Schema ist über
+-- die Daten-API nicht erreichbar und für anon und authenticated nicht nutzbar.
+-- Das gilt auch dann, wenn im selben Projekt eine andere Anwendung Rechte auf
+-- Funktionen im Schema public pauschal vergibt.
+
+create schema if not exists hp_private;
+revoke all on schema hp_private from public, anon, authenticated;
 
 create table public.hp_helpers (
   id uuid primary key default gen_random_uuid(),

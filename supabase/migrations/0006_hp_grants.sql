@@ -1,13 +1,16 @@
 -- Bendito Helferplan 5.0.0 — Ausführungsrechte
 --
 -- Neue Funktionen sind in Postgres für PUBLIC ausführbar, und Supabase gibt sie
--- zusätzlich an anon und authenticated. Deshalb zuerst alles entziehen, dann
--- gezielt freigeben. Bewusst nur für hp_-Funktionen, damit ein gemeinsam
--- genutztes Projekt (Check-in) unberührt bleibt.
+-- im Schema public zusätzlich an anon und authenticated. Deshalb zuerst alles
+-- entziehen, dann gezielt freigeben. Bewusst nur für die eigenen Funktionen
+-- (public.hp_… und alles in hp_private), damit ein gemeinsam genutztes Projekt
+-- (Check-in) unberührt bleibt.
 --
 -- Diese Datei darf beliebig oft laufen. Wird im selben Projekt später eine
--- Migration eingespielt, die Rechte pauschal entzieht, diese Datei danach
--- erneut ausführen.
+-- Migration eingespielt, die Rechte pauschal entzieht oder vergibt, diese Datei
+-- danach erneut ausführen.
+
+revoke all on schema hp_private from public, anon, authenticated;
 
 do $$
 declare
@@ -16,10 +19,29 @@ begin
   for f in
     select p.oid::regprocedure as sig
     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
-    where n.nspname = 'public' and p.proname like 'hp\_%'
+    where (n.nspname = 'public' and p.proname like 'hp\_%')
+       or n.nspname = 'hp_private'
   loop
     execute format('revoke all on function %s from public, anon, authenticated', f.sig);
   end loop;
+end $$;
+
+-- Die Edge Function arbeitet als service_role und braucht nur die beiden
+-- Login-Funktionen. Alles andere ist auch für sie zu.
+do $$
+declare
+  f record;
+begin
+  if exists (select 1 from pg_roles where rolname = 'service_role') then
+    for f in
+      select p.oid::regprocedure as sig
+      from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+      where (n.nspname = 'public' and p.proname like 'hp\_%')
+         or n.nspname = 'hp_private'
+    loop
+      execute format('revoke all on function %s from service_role', f.sig);
+    end loop;
+  end if;
 end $$;
 
 -- Für angemeldete Sitzungen. Jede Funktion prüft selbst, ob der Aufrufer Orga

@@ -6,15 +6,15 @@
 --     Zuordnung hp_helpers.auth_user_id.
 --   * Fachliche Ablehnungen kommen als {"ok": false, "code": "..."} zurück und
 --     ändern nichts am Plan. Fehlende Berechtigung ist eine Ausnahme (42501).
---   * Jede ändernde Funktion ruft zuerst hp__touch(). Das zählt den Datenstand
---     hoch und hält die Zeile bis zum Ende der Transaktion gesperrt: Änderungen
---     am Plan laufen damit strikt nacheinander.
---   * Funktionen mit doppeltem Unterstrich (hp__) sind intern und für keinen
---     Client ausführbar (siehe 0005).
+--   * Jede ändernde Funktion ruft zuerst hp_private.touch(). Das zählt den
+--     Datenstand hoch und hält die Zeile bis zum Ende der Transaktion gesperrt:
+--     Änderungen am Plan laufen damit strikt nacheinander.
+--   * Funktionen im Schema hp_private sind intern und für keinen Client
+--     erreichbar (siehe 0001 und 0006).
 
 -- ---------------------------------------------------------------- intern
 
-create or replace function public.hp__is_admin()
+create or replace function hp_private.is_admin()
 returns boolean
 language sql stable security definer set search_path = ''
 as $$
@@ -24,7 +24,7 @@ as $$
   );
 $$;
 
-create or replace function public.hp__helper_id()
+create or replace function hp_private.helper_id()
 returns uuid
 language sql stable security definer set search_path = ''
 as $$
@@ -32,7 +32,7 @@ as $$
   where h.auth_user_id = (select auth.uid()) and h.active;
 $$;
 
-create or replace function public.hp__touch()
+create or replace function hp_private.touch()
 returns void
 language sql security definer set search_path = ''
 as $$
@@ -41,7 +41,7 @@ as $$
    where key = 'data_version';
 $$;
 
-create or replace function public.hp__audit(p_action text, p_shift text, p_helper uuid, p_outcome text)
+create or replace function hp_private.audit(p_action text, p_shift text, p_helper uuid, p_outcome text)
 returns void
 language sql security definer set search_path = ''
 as $$
@@ -49,18 +49,18 @@ as $$
   values ((select auth.uid()), p_action, p_shift, p_helper, coalesce(p_outcome, 'ok'));
 $$;
 
-create or replace function public.hp__fail(p_action text, p_shift text, p_helper uuid, p_code text)
+create or replace function hp_private.fail(p_action text, p_shift text, p_helper uuid, p_code text)
 returns jsonb
 language plpgsql security definer set search_path = ''
 as $$
 begin
-  perform public.hp__audit(p_action, p_shift, p_helper, p_code);
+  perform hp_private.audit(p_action, p_shift, p_helper, p_code);
   return jsonb_build_object('ok', false, 'code', p_code);
 end;
 $$;
 
 -- Tausch gesperrt: Schalter gesetzt oder Sperrzeitpunkt erreicht.
-create or replace function public.hp__locked()
+create or replace function hp_private.locked()
 returns boolean
 language sql stable security definer set search_path = ''
 as $$
@@ -76,7 +76,7 @@ $$;
 
 -- Liefert eine Schicht des Helfers, die sich mit p_shift zeitlich überschneidet,
 -- oder null. p_ignore wird nicht mitgeprüft (die Schicht, die er dafür abgibt).
-create or replace function public.hp__conflict(p_helper uuid, p_shift text, p_ignore text)
+create or replace function hp_private.conflict(p_helper uuid, p_shift text, p_ignore text)
 returns text
 language sql stable security definer set search_path = ''
 as $$
@@ -93,7 +93,7 @@ as $$
   limit 1;
 $$;
 
-create or replace function public.hp__notify(p_helper uuid, p_kind text, p_swap bigint)
+create or replace function hp_private.notify(p_helper uuid, p_kind text, p_swap bigint)
 returns void
 language sql security definer set search_path = ''
 as $$
@@ -104,7 +104,7 @@ $$;
 -- Anfragender nicht mehr in der Ausgangsschicht, schon in der Zielschicht oder
 -- nicht mehr aktiv; bei „swap“ niemand mehr da, der annehmen könnte; bei „move“
 -- kein freier Platz mehr.
-create or replace function public.hp__sweep()
+create or replace function hp_private.sweep()
 returns void
 language plpgsql security definer set search_path = ''
 as $$
@@ -130,41 +130,112 @@ begin
       )
   loop
     update public.hp_swaps set status = 'expired', resolved_at = now() where id = r.id;
-    perform public.hp__notify(r.from_helper, 'swap_expired', r.id);
+    perform hp_private.notify(r.from_helper, 'swap_expired', r.id);
   end loop;
 end;
+$$;
+
+-- Erkennt die künstlichen Helfer-Konten, die die Edge Function hp-login anlegt:
+-- Adresse hp-…@helfer.bendito.invalid UND die Marke hp = helper in den
+-- App-Metadaten. Beides zusammen, damit in einem gemeinsam genutzten Projekt nie
+-- ein Konto einer anderen Anwendung getroffen wird. Orga-Konten sind immer
+-- ausgenommen, auch deaktivierte.
+create or replace function hp_private.is_helper_account(p_user uuid)
+returns boolean
+language sql stable security definer set search_path = ''
+as $$
+  select exists (
+    select 1 from auth.users u
+    where u.id = p_user
+      and u.email like 'hp-%@helfer.bendito.invalid'
+      and u.raw_app_meta_data ->> 'hp' = 'helper'
+      and not exists (select 1 from public.hp_admins a where a.user_id = u.id)
+  );
 $$;
 
 -- Löscht das Auth-Konto eines Helfers. Nur die künstlichen Helfer-Konten,
 -- niemals ein Orga-Konto. Scheitert das Löschen, bleibt der Zugang trotzdem zu,
 -- weil die Zuordnung in hp_helpers vorher entfernt wurde.
-create or replace function public.hp__drop_auth(p_user uuid)
+create or replace function hp_private.drop_auth(p_user uuid)
 returns void
 language plpgsql security definer set search_path = ''
 as $$
 begin
-  if p_user is null then
+  if p_user is null or not hp_private.is_helper_account(p_user) then
     return;
   end if;
   begin
-    delete from auth.users u
-    where u.id = p_user
-      and u.email like 'hp-%@helfer.bendito.invalid'
-      and not exists (select 1 from public.hp_admins a where a.user_id = p_user);
+    delete from auth.users u where u.id = p_user;
   exception when others then
-    perform public.hp__audit('auth_cleanup', null, null, 'FAILED');
+    perform hp_private.audit('auth_cleanup', null, null, 'FAILED');
   end;
 end;
 $$;
 
-create or replace function public.hp__require_admin()
+-- Entfernt künstliche Helfer-Konten, an denen kein Helfer mehr hängt. Solche
+-- Konten entstehen, wenn eine Anmeldung zwischen Anlegen und Zuordnen abbricht.
+-- p_min_age schont Anmeldungen, die gerade laufen. Jedes Konto wird einzeln
+-- gelöscht: Scheitert eines, bleiben die anderen nicht liegen.
+create or replace function hp_private.drop_orphans(p_min_age interval)
+returns int
+language plpgsql security definer set search_path = ''
+as $$
+declare
+  r record;
+  v_n int := 0;
+begin
+  for r in
+    select u.id from auth.users u
+    where hp_private.is_helper_account(u.id)
+      and coalesce(u.created_at, '-infinity'::timestamptz) <= now() - coalesce(p_min_age, interval '0')
+      and not exists (select 1 from public.hp_helpers h where h.auth_user_id = u.id)
+  loop
+    begin
+      delete from auth.users u where u.id = r.id;
+      v_n := v_n + 1;
+    exception when others then
+      perform hp_private.audit('auth_cleanup', null, null, 'FAILED');
+    end;
+  end loop;
+  return v_n;
+end;
+$$;
+
+-- Wie viele künstliche Helfer-Konten gibt es noch? Nach der Löschung muss das 0 sein.
+create or replace function hp_private.helper_accounts_left()
+returns int
+language sql stable security definer set search_path = ''
+as $$
+  select count(*)::int from auth.users u where hp_private.is_helper_account(u.id);
+$$;
+
+create or replace function hp_private.require_admin()
 returns void
 language plpgsql stable security definer set search_path = ''
 as $$
 begin
-  if not public.hp__is_admin() then
+  if not hp_private.is_admin() then
     raise exception 'NOT_ALLOWED' using errcode = '42501';
   end if;
+end;
+$$;
+
+-- Für Funktionen, die nur die Edge Function aufrufen darf. Der Entzug der
+-- Ausführungsrechte (0006) ist die erste Sperre, diese Prüfung die zweite: Sie
+-- hält auch dann, wenn eine andere Anwendung im selben Projekt Funktionsrechte
+-- pauschal vergibt. Durchgelassen wird nur service_role und der Eigentümer der
+-- Funktionen selbst (SQL-Editor, Tests).
+create or replace function hp_private.require_service()
+returns void
+language plpgsql stable security definer set search_path = ''
+as $$
+declare
+  v_role text := coalesce(nullif(nullif(current_setting('role', true), ''), 'none'), session_user::text);
+begin
+  if v_role = 'service_role' or v_role = current_user::text then
+    return;
+  end if;
+  raise exception 'NOT_ALLOWED' using errcode = '42501';
 end;
 $$;
 
@@ -176,11 +247,11 @@ language sql stable security definer set search_path = ''
 as $$
   select jsonb_build_object(
     'role', case
-              when public.hp__is_admin() then 'admin'
-              when public.hp__helper_id() is not null then 'helper'
+              when hp_private.is_admin() then 'admin'
+              when hp_private.helper_id() is not null then 'helper'
               else 'none'
             end,
-    'helper_id', case when public.hp__is_admin() then null else public.hp__helper_id() end,
+    'helper_id', case when hp_private.is_admin() then null else hp_private.helper_id() end,
     'server_time', now(),
     'version', (select (s.value #>> '{}')::bigint from public.hp_settings s where s.key = 'data_version')
   );
@@ -192,8 +263,8 @@ returns jsonb
 language plpgsql stable security definer set search_path = ''
 as $$
 declare
-  v_admin boolean := public.hp__is_admin();
-  v_me uuid := public.hp__helper_id();
+  v_admin boolean := hp_private.is_admin();
+  v_me uuid := hp_private.helper_id();
   v jsonb;
 begin
   if v_admin then
@@ -211,7 +282,7 @@ begin
       'swaps_lock_at', (select s.value from public.hp_settings s where s.key = 'swaps_lock_at'),
       'event_end', (select s.value from public.hp_settings s where s.key = 'event_end'),
       'purge_after', (select s.value from public.hp_settings s where s.key = 'purge_after'),
-      'locked', public.hp__locked()
+      'locked', hp_private.locked()
     ),
     'helpers', coalesce((
       select jsonb_agg(
@@ -286,7 +357,7 @@ returns jsonb
 language plpgsql security definer set search_path = ''
 as $$
 declare
-  v_me uuid := public.hp__helper_id();
+  v_me uuid := hp_private.helper_id();
 begin
   if v_me is null then
     raise exception 'NOT_ALLOWED' using errcode = '42501';
@@ -312,38 +383,38 @@ declare
   v_n int;
   v_conflict text;
 begin
-  perform public.hp__require_admin();
-  perform public.hp__touch();
+  perform hp_private.require_admin();
+  perform hp_private.touch();
 
   select * into v_shift from public.hp_shifts where id = p_shift;
   if not found then
-    return public.hp__fail('assign', p_shift, p_helper, 'NOT_FOUND');
+    return hp_private.fail('assign', p_shift, p_helper, 'NOT_FOUND');
   end if;
   select * into v_helper from public.hp_helpers where id = p_helper;
   if not found then
-    return public.hp__fail('assign', p_shift, p_helper, 'NOT_FOUND');
+    return hp_private.fail('assign', p_shift, p_helper, 'NOT_FOUND');
   end if;
   if not v_helper.active then
-    return public.hp__fail('assign', p_shift, p_helper, 'HELPER_INACTIVE');
+    return hp_private.fail('assign', p_shift, p_helper, 'HELPER_INACTIVE');
   end if;
   if exists (select 1 from public.hp_assignments a where a.shift_id = p_shift and a.helper_id = p_helper) then
-    return public.hp__fail('assign', p_shift, p_helper, 'ASSIGN_DUPLICATE');
+    return hp_private.fail('assign', p_shift, p_helper, 'ASSIGN_DUPLICATE');
   end if;
   select count(*) into v_n from public.hp_assignments a where a.shift_id = p_shift;
   if v_n >= v_shift.capacity then
-    return public.hp__fail('assign', p_shift, p_helper, 'SHIFT_FULL');
+    return hp_private.fail('assign', p_shift, p_helper, 'SHIFT_FULL');
   end if;
 
-  v_conflict := public.hp__conflict(p_helper, p_shift, null);
+  v_conflict := hp_private.conflict(p_helper, p_shift, null);
   if v_conflict is not null and not coalesce(p_force, false) then
-    perform public.hp__audit('assign', p_shift, p_helper, 'ASSIGN_OVERLAP');
+    perform hp_private.audit('assign', p_shift, p_helper, 'ASSIGN_OVERLAP');
     return jsonb_build_object('ok', false, 'code', 'ASSIGN_OVERLAP', 'conflict_shift', v_conflict);
   end if;
 
   insert into public.hp_assignments (shift_id, helper_id, assigned_by)
   values (p_shift, p_helper, (select auth.uid()));
-  perform public.hp__sweep();
-  perform public.hp__audit('assign', p_shift, p_helper, case when v_conflict is null then 'ok' else 'ok_forced' end);
+  perform hp_private.sweep();
+  perform hp_private.audit('assign', p_shift, p_helper, case when v_conflict is null then 'ok' else 'ok_forced' end);
   return jsonb_build_object('ok', true);
 end;
 $$;
@@ -353,31 +424,34 @@ returns jsonb
 language plpgsql security definer set search_path = ''
 as $$
 begin
-  perform public.hp__require_admin();
-  perform public.hp__touch();
+  perform hp_private.require_admin();
+  perform hp_private.touch();
 
   delete from public.hp_assignments a where a.shift_id = p_shift and a.helper_id = p_helper;
   if not found then
-    return public.hp__fail('unassign', p_shift, p_helper, 'NOT_FOUND');
+    return hp_private.fail('unassign', p_shift, p_helper, 'NOT_FOUND');
   end if;
   -- Offene Tauschvorgänge zu dieser Zuweisung verfallen.
-  perform public.hp__sweep();
-  perform public.hp__audit('unassign', p_shift, p_helper, 'ok');
+  perform hp_private.sweep();
+  perform hp_private.audit('unassign', p_shift, p_helper, 'ok');
   return jsonb_build_object('ok', true);
 end;
 $$;
 
 -- ---------------------------------------------------------------- Orga: Helfer
 
-create or replace function public.hp__name_ok(p_name text)
+create or replace function hp_private.name_ok(p_name text)
 returns boolean
 language sql immutable set search_path = ''
 as $$
   -- 1 bis 40 Zeichen, keine Adresse, keine Nummer: nur der Anzeigename.
+  -- Höchstens vier Ziffern insgesamt, damit auch eine Telefonnummer mit
+  -- Leerzeichen nicht durchgeht. Das fängt Versehen ab, nicht jede Umschreibung.
   select p_name is not null
      and char_length(btrim(p_name)) between 1 and 40
      and btrim(p_name) !~ '@'
      and btrim(p_name) !~ '[0-9]{4,}'
+     and char_length(regexp_replace(p_name, '[^0-9]', '', 'g')) <= 4
      and btrim(p_name) !~ '[<>]';
 $$;
 
@@ -399,14 +473,14 @@ declare
   v_color text := coalesce(nullif(btrim(coalesce(p_color, '')), ''), '#C9962B');
   v_contact text := coalesce(btrim(p_contact), '');
 begin
-  perform public.hp__require_admin();
-  perform public.hp__touch();
+  perform hp_private.require_admin();
+  perform hp_private.touch();
 
-  if not public.hp__name_ok(v_name)
+  if not hp_private.name_ok(v_name)
      or v_color !~ '^#[0-9A-Fa-f]{6}$'
      or v_contact not in ('', 'WhatsApp', 'Signal', 'Telegram', 'Threema', 'E-Mail', 'Telefon', 'SMS')
      or (p_target is not null and p_target not between 0 and 30) then
-    return public.hp__fail('upsert_helper', null, p_id, 'INVALID_INPUT');
+    return hp_private.fail('upsert_helper', null, p_id, 'INVALID_INPUT');
   end if;
 
   if exists (
@@ -414,7 +488,7 @@ begin
     where h.active and lower(btrim(h.display_name)) = lower(v_name)
       and (p_id is null or h.id <> p_id)
   ) then
-    return public.hp__fail('upsert_helper', null, p_id, 'NAME_TAKEN');
+    return hp_private.fail('upsert_helper', null, p_id, 'NAME_TAKEN');
   end if;
 
   if p_id is null then
@@ -432,11 +506,11 @@ begin
      where h.id = p_id
      returning h.id into v_id;
     if v_id is null then
-      return public.hp__fail('upsert_helper', null, p_id, 'NOT_FOUND');
+      return hp_private.fail('upsert_helper', null, p_id, 'NOT_FOUND');
     end if;
   end if;
 
-  perform public.hp__audit('upsert_helper', null, v_id, 'ok');
+  perform hp_private.audit('upsert_helper', null, v_id, 'ok');
   return jsonb_build_object('ok', true, 'id', v_id);
 end;
 $$;
@@ -458,11 +532,11 @@ declare
   v_name text;
   v_id uuid;
 begin
-  perform public.hp__require_admin();
-  perform public.hp__touch();
+  perform hp_private.require_admin();
+  perform hp_private.touch();
 
   if p_names is null or coalesce(array_length(p_names, 1), 0) = 0 or array_length(p_names, 1) > 80 then
-    return public.hp__fail('add_helpers', null, null, 'INVALID_INPUT');
+    return hp_private.fail('add_helpers', null, null, 'INVALID_INPUT');
   end if;
 
   select count(*) into v_base from public.hp_helpers;
@@ -471,7 +545,7 @@ begin
   loop
     v_name := btrim(coalesce(v_name, ''));
     continue when v_name = '';
-    if not public.hp__name_ok(v_name)
+    if not hp_private.name_ok(v_name)
        or exists (select 1 from public.hp_helpers h
                   where h.active and lower(btrim(h.display_name)) = lower(v_name)) then
       v_skipped := v_skipped || v_name;
@@ -481,7 +555,7 @@ begin
     values (v_name, v_palette[1 + ((v_base + v_created) % array_length(v_palette, 1))], coalesce(p_is_test, false))
     returning id into v_id;
     v_created := v_created + 1;
-    perform public.hp__audit('upsert_helper', null, v_id, 'ok');
+    perform hp_private.audit('upsert_helper', null, v_id, 'ok');
   end loop;
 
   return jsonb_build_object('ok', true, 'created', v_created, 'skipped', to_jsonb(v_skipped));
@@ -498,17 +572,17 @@ declare
   v_helper public.hp_helpers;
   v_n int;
 begin
-  perform public.hp__require_admin();
-  perform public.hp__touch();
+  perform hp_private.require_admin();
+  perform hp_private.touch();
 
   select * into v_helper from public.hp_helpers where id = p_helper;
   if not found then
-    return public.hp__fail('deactivate_helper', null, p_helper, 'NOT_FOUND');
+    return hp_private.fail('deactivate_helper', null, p_helper, 'NOT_FOUND');
   end if;
 
   select count(*) into v_n from public.hp_assignments a where a.helper_id = p_helper;
   if v_n > 0 and not coalesce(p_confirm, false) then
-    perform public.hp__audit('deactivate_helper', null, p_helper, 'CONFIRM_REQUIRED');
+    perform hp_private.audit('deactivate_helper', null, p_helper, 'CONFIRM_REQUIRED');
     return jsonb_build_object('ok', false, 'code', 'CONFIRM_REQUIRED', 'assignments', v_n);
   end if;
 
@@ -516,9 +590,9 @@ begin
   update public.hp_helpers h
      set active = false, login_code_hash = null, login_code_created_at = null, auth_user_id = null
    where h.id = p_helper;
-  perform public.hp__drop_auth(v_helper.auth_user_id);
-  perform public.hp__sweep();
-  perform public.hp__audit('deactivate_helper', null, p_helper, 'ok');
+  perform hp_private.drop_auth(v_helper.auth_user_id);
+  perform hp_private.sweep();
+  perform hp_private.audit('deactivate_helper', null, p_helper, 'ok');
   return jsonb_build_object('ok', true, 'removed_assignments', v_n);
 end;
 $$;
@@ -530,22 +604,22 @@ as $$
 declare
   v_helper public.hp_helpers;
 begin
-  perform public.hp__require_admin();
-  perform public.hp__touch();
+  perform hp_private.require_admin();
+  perform hp_private.touch();
 
   select * into v_helper from public.hp_helpers where id = p_helper;
   if not found then
-    return public.hp__fail('reactivate_helper', null, p_helper, 'NOT_FOUND');
+    return hp_private.fail('reactivate_helper', null, p_helper, 'NOT_FOUND');
   end if;
   if exists (
     select 1 from public.hp_helpers h
     where h.active and h.id <> p_helper
       and lower(btrim(h.display_name)) = lower(btrim(v_helper.display_name))
   ) then
-    return public.hp__fail('reactivate_helper', null, p_helper, 'NAME_TAKEN');
+    return hp_private.fail('reactivate_helper', null, p_helper, 'NAME_TAKEN');
   end if;
   update public.hp_helpers h set active = true where h.id = p_helper;
-  perform public.hp__audit('reactivate_helper', null, p_helper, 'ok');
+  perform hp_private.audit('reactivate_helper', null, p_helper, 'ok');
   return jsonb_build_object('ok', true);
 end;
 $$;
@@ -560,8 +634,11 @@ declare
   v_ok boolean := false;
   v_num numeric;
 begin
-  perform public.hp__require_admin();
-  perform public.hp__touch();
+  perform hp_private.require_admin();
+  perform hp_private.touch();
+
+  -- Die Daten-API reicht ein JSON-null als SQL-NULL durch.
+  p_value := coalesce(p_value, 'null'::jsonb);
 
   if p_key = 'target_shifts' and jsonb_typeof(p_value) = 'number' then
     v_num := (p_value #>> '{}')::numeric;
@@ -574,7 +651,9 @@ begin
   elsif p_key in ('swaps_lock_at', 'event_end') then
     if jsonb_typeof(p_value) = 'null' then
       v_ok := p_key = 'swaps_lock_at';
-    elsif jsonb_typeof(p_value) = 'string' then
+    elsif jsonb_typeof(p_value) = 'string'
+          -- Nur ein voller Zeitpunkt mit Zeitzone, kein „infinity“ oder „today“.
+          and (p_value #>> '{}') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}(:[0-9]{2}(\.[0-9]{1,6})?)?(Z|[+-][0-9]{2}:[0-9]{2})$' then
       begin
         perform (p_value #>> '{}')::timestamptz;
         v_ok := true;
@@ -582,7 +661,8 @@ begin
         v_ok := false;
       end;
     end if;
-  elsif p_key = 'purge_after' and jsonb_typeof(p_value) = 'string' then
+  elsif p_key = 'purge_after' and jsonb_typeof(p_value) = 'string'
+        and (p_value #>> '{}') ~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}$' then
     begin
       perform (p_value #>> '{}')::date;
       v_ok := true;
@@ -592,11 +672,11 @@ begin
   end if;
 
   if not v_ok then
-    return public.hp__fail('set_setting:' || left(coalesce(p_key, ''), 30), null, null, 'INVALID_INPUT');
+    return hp_private.fail('set_setting:' || left(coalesce(p_key, ''), 30), null, null, 'INVALID_INPUT');
   end if;
 
   update public.hp_settings s set value = p_value, updated_at = now() where s.key = p_key;
-  perform public.hp__audit('set_setting:' || p_key, null, null, 'ok');
+  perform hp_private.audit('set_setting:' || p_key, null, null, 'ok');
   return jsonb_build_object('ok', true);
 end;
 $$;
@@ -611,18 +691,18 @@ declare
   r record;
   v_n int := 0;
 begin
-  perform public.hp__require_admin();
-  perform public.hp__touch();
+  perform hp_private.require_admin();
+  perform hp_private.touch();
 
   for r in select h.id, h.auth_user_id from public.hp_helpers h where h.is_test
   loop
     -- Zuweisungen, Tausch und Benachrichtigungen hängen per Fremdschlüssel am Helfer.
     delete from public.hp_helpers h where h.id = r.id;
-    perform public.hp__drop_auth(r.auth_user_id);
+    perform hp_private.drop_auth(r.auth_user_id);
     v_n := v_n + 1;
   end loop;
-  perform public.hp__sweep();
-  perform public.hp__audit('remove_test_data', null, null, 'ok:' || v_n::text);
+  perform hp_private.sweep();
+  perform hp_private.audit('remove_test_data', null, null, 'ok:' || v_n::text);
   return jsonb_build_object('ok', true, 'removed', v_n);
 end;
 $$;
@@ -639,12 +719,13 @@ declare
   v_helpers int;
   v_assign int;
   v_swaps int;
+  v_left int;
 begin
-  perform public.hp__require_admin();
-  perform public.hp__touch();
+  perform hp_private.require_admin();
+  perform hp_private.touch();
 
   if p_confirm is distinct from 'LOESCHEN' then
-    return public.hp__fail('purge', null, null, 'CONFIRM_REQUIRED');
+    return hp_private.fail('purge', null, null, 'CONFIRM_REQUIRED');
   end if;
 
   select count(*) into v_helpers from public.hp_helpers;
@@ -654,7 +735,7 @@ begin
   for r in select h.auth_user_id from public.hp_helpers h where h.auth_user_id is not null
   loop
     update public.hp_helpers h set auth_user_id = null where h.auth_user_id = r.auth_user_id;
-    perform public.hp__drop_auth(r.auth_user_id);
+    perform hp_private.drop_auth(r.auth_user_id);
   end loop;
 
   delete from public.hp_notifications where true;
@@ -663,8 +744,11 @@ begin
   delete from public.hp_helpers where true;
   delete from public.hp_login_attempts where true;
   delete from public.hp_audit where true;
+  perform hp_private.drop_orphans(interval '0');
+  -- Ließ sich ein Anmeldekonto nicht löschen, erfährt die Orga das.
+  v_left := hp_private.helper_accounts_left();
 
-  perform public.hp__audit('purge', null, null, 'ok');
-  return jsonb_build_object('ok', true, 'helpers', v_helpers, 'assignments', v_assign, 'swaps', v_swaps);
+  perform hp_private.audit('purge', null, null, case when v_left = 0 then 'ok' else 'ok:auth_left' end);
+  return jsonb_build_object('ok', true, 'helpers', v_helpers, 'assignments', v_assign, 'swaps', v_swaps, 'auth_left', v_left);
 end;
 $$;

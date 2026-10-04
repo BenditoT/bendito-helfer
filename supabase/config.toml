@@ -1,0 +1,8 @@
+# Einstellungen für die Supabase-CLI. Hier steht nur, was die App braucht.
+#
+# hp-login ist der Login selbst: Die Funktion prüft den Code aus dem persönlichen
+# Link. Die JWT-Prüfung des Gateways bleibt deshalb aus. Mit eingeschalteter
+# Prüfung würden Aufrufe mit einem publishable-Schlüssel (sb_publishable_…)
+# abgewiesen, bevor die Funktion läuft.
+[functions.hp-login]
+verify_jwt = false
