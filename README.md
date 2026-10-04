@@ -52,6 +52,13 @@ Rot gewordene Tests werden nicht durch längere Wartezeiten grün gemacht. Die 3
 4. `node tools/set-backend.mjs https://<projekt>.supabase.co <anon-Schlüssel>` trägt das Projekt in `config.js` und in die Content-Security-Policy ein.
 5. Prüfen: `supabase/tests/t_rights.sql` und `t_swaps.sql` im SQL-Editor laufen lassen, den Security Advisor ansehen, dann den Browser-Testlauf.
 
+Hinweise zum Dashboard, falls ohne Supabase-CLI eingerichtet wird:
+
+- Der SQL-Editor fragt bei `0001` nach, weil Tabellen zunächst ohne Zeilensicherheit entstehen. Das Skript schaltet sie im selben Lauf selbst ein; „Run without RLS“ ist hier richtig. Bei `0002` bis `0004` genügt „Run query“.
+- Im Funktions-Editor heißt der Schalter für die JWT-Prüfung „Verify JWT with legacy secret“. Er muss **aus** sein.
+- Die Testskripte melden ihr Ergebnis als Fehlermeldung, die mit `HP_TEST_RESULTS` beginnt. Das ist Absicht: So bleibt von den Testdaten nichts in der Datenbank.
+- Der Security Advisor meldet für die 18 Funktionen der App je eine Warnung. Begründung in `docs/REVIEW-5.0.0.md`.
+
 Läuft die App unter einer anderen Adresse als `https://benditot.github.io`, die Herkunft in der Umgebungsvariable `HP_ALLOWED_ORIGINS` der Funktion eintragen (kommagetrennt, nur `https://…`).
 
 ### Ein Projekt gemeinsam mit einer anderen App

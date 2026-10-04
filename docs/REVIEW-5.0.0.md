@@ -1,6 +1,6 @@
 # Experten-Review Helferplan 5.0.0
 
-Stand 04.10.2026. Geprüft wurde der Stand im Repository, lokal gegen einen Nachbau von Supabase (Postgres 16, die echte Login-Funktion unter Deno). **Nicht geprüft** wurde gegen ein echtes Supabase-Projekt und gegen die veröffentlichte Seite, weil beides zum Zeitpunkt des Reviews noch nicht eingerichtet war. Was dort als Erstes zu prüfen ist, steht am Ende.
+Stand 05.10.2026. Das Review selbst (beide Durchgänge) lief am 04.10.2026 am Stand im Repository, lokal gegen einen Nachbau von Supabase (Postgres 16, die echte Login-Funktion unter Deno). Seit der Nacht zum 05.10.2026 stehen das echte Supabase-Projekt und die veröffentlichte Seite. Was dort seitdem geprüft ist und was noch fehlt, steht am Ende unter „Prüfliste im echten Projekt“. **Noch nicht gelaufen** ist der Durchgang mit Anmeldung auf der veröffentlichten Seite; er braucht ein Orga-Konto.
 
 ## Ergebnis
 
@@ -26,7 +26,7 @@ Quelle: `reviews/SECURITY-CODE-REVIEW.md` (S1–S10) und `reviews/DOMAIN-UX-REVI
 | S10 | `dangerouslySetInnerHTML` | geschlossen | Nur zwei Stellen mit festen Texten aus dem Quelltext. Statischer Test. |
 | D1 | Oberfläche versprach Zusammenarbeit ohne gemeinsamen Stand | geschlossen | Wie S2. |
 | D2 | Tausch verletzte die fachliche Regel | geschlossen | Wie S3. |
-| D3 | Kein einsatzfähiger veröffentlichter Stand | offen bis zur Veröffentlichung | Die App ist fertig und lokal vollständig getestet. Einsatzfähig ist sie erst, wenn Seite und Datenbank eingerichtet sind und der Testlauf dort grün ist. Stand in der Übergabe. |
+| D3 | Kein einsatzfähiger veröffentlichter Stand | offen bis zum Durchgang mit Anmeldung | Seite und Datenbank stehen seit dem 05.10.2026, die Datenbanktests sind dort grün. Einsatzfähig ist die App erst, wenn der Durchgang mit Anmeldung auf der veröffentlichten Seite grün ist (Prüfliste 2 und 12). Stand in der Übergabe. |
 | D4 | Aktualität für Helfer nicht erkennbar | geschlossen | „Stand hh:mm:ss“ dauerhaft sichtbar. Ohne Netz rot mit Uhrzeit des letzten Stands. |
 | D5 | Kein Weg zur Wiederherstellung und Übergabe | geschlossen, mit Rest | Betriebsanleitung, Übergabe, Sicherung als Datei, Druckansicht. Rest: siehe „Bewusst offen“ 3. |
 | D6 | Bedienung unter Stress und Barrierearmut | geschlossen, mit Rest | Tastaturbedienung, Fokusführung, Tippziele ab 44 px, Telefonbreite 390 px. Testlauf 6c, 6d, 1e. Rest: siehe „Bewusst offen“ 6. |
@@ -85,21 +85,31 @@ Zu jedem neuen Schutz wurde in einer Kopie ein Fehler eingebaut und geprüft, ob
 5. **Keine Benachrichtigung bei Änderungen durch die Orga.** Wäre ein eigener Baustein. Stattdessen erinnert die App die Orga, Bescheid zu sagen, und die Ankündigung enthält eine fertige Zeile dafür.
 6. **Kein Test mit einem Screenreader.** Geprüft sind Tastatur, Fokus, Beschriftungen und Rollen, nicht die Ausgabe eines Vorleseprogramms.
 7. **Zwei Stellen in der Login-Funktion ohne eigenen Test.** Das Aufräumen eines Kontos, wenn die Zuordnung im letzten Moment scheitert, lässt sich über HTTP nicht gezielt auslösen; ein liegen gebliebenes Konto räumt die Datenbank später ab (Test R20). Die Formatprüfung des Codes ändert das Ergebnis nicht: Ein falsch geformter Code ist auch ohne sie ungültig.
-8. **Gleichzeitiges Öffnen desselben Links auf zwei Geräten.** Das zweite Einmal-Token kann das erste entwerten. Das betroffene Gerät zeigt „Link nicht gültig“; erneutes Öffnen genügt. Nur im echten Projekt prüfbar.
+8. **Gleichzeitiges Öffnen desselben Links auf zwei Geräten.** Das zweite Einmal-Token kann das erste entwerten. Das betroffene Gerät zeigt „Link nicht gültig“; erneutes Öffnen genügt. Nur im echten Projekt prüfbar, dort noch offen.
 9. **Gemeinsamer Browser-Speicher unter `benditot.github.io`.** Alle Seiten unter dieser Adresse können die Anmeldung der anderen lesen. Dort also nur eigene, geprüfte Seiten veröffentlichen.
 10. **Datenschutztext.** Die Kurzfassung in der App und der Absatz in der Ankündigung beschreiben, was die App tut. Ob das rechtlich genügt, ist nicht geprüft.
 
-## Zuerst prüfen, sobald das echte Projekt steht
+## Prüfliste im echten Projekt
 
-1. Login-Funktion erreichbar mit dem Schlüssel aus `config.js`, von der Pages-Adresse aus (Herkunft).
-2. Ganze Kette mit einem Testhelfer: Link erzeugen, öffnen, Plan sehen; dasselbe auf einem zweiten Gerät.
-3. `supabase/tests/t_rights.sql` und `t_swaps.sql` im SQL-Editor: alle Fälle grün.
-4. Security Advisor ohne Fehler.
-5. Ohne Anmeldung und mit einem selbst registrierten Konto: kein Zugriff. Selbstregistrierung im Projekt abschalten, wenn die zweite App sie nicht braucht.
-6. Im gemeinsamen Projekt: mit dem Token eines Testhelfers jede Tabelle und Funktion der zweiten App aufrufen. Alles muss abgelehnt werden.
-7. Link erneuern: Das alte Anmeldekonto ist weg, im Protokoll steht kein `auth_cleanup FAILED`.
-8. Sperrzeitpunkt in den Einstellungen leeren und wieder setzen.
-9. Eine Sitzung länger als eine Stunde offen lassen: Die App bleibt angemeldet.
-10. Welche Absenderadresse die Login-Funktion sieht (Begrenzung der Fehlversuche je Anschluss).
-11. Region des Projekts und was passiert, wenn es pausiert ist.
-12. Danach der Browser-Testlauf gegen die veröffentlichte Seite.
+Stand 05.10.2026, Projekt in Frankfurt (`eu-central-1`), Postgres 17. Die Migrationen wurden unverändert aus dem veröffentlichten Repository geladen (Prüfsumme je Datei gleich dem lokalen Stand). Ein Abgleich von Tabellen, Spalten, Indizes, Regeln, Funktionen und Rechten ergab denselben Fingerabdruck wie in der lokalen Testdatenbank: 9 Tabellen mit eingeschalteter Zeilensicherheit, 20 Funktionen im Schema `public`, 17 in `hp_private`, davon ohne Anmeldung aufrufbar 0, angemeldet 18, nur für die Edge Function 2.
+
+| Nr. | Prüfung | Stand | Ergebnis |
+|---|---|---|---|
+| 1 | Login-Funktion erreichbar mit dem Schlüssel aus `config.js`, von der Pages-Adresse aus | erledigt | Falscher Link auf der veröffentlichten Seite zeigt „Dieser Link ist nicht gültig“. Vorabfrage des Browsers erlaubt nur die Pages-Adresse, eine fremde Herkunft wird nicht zurückgespiegelt. |
+| 2 | Ganze Kette mit einem Testhelfer, auch auf einem zweiten Gerät | **offen** | Braucht ein Orga-Konto. |
+| 3 | `t_rights.sql` und `t_swaps.sql` im SQL-Editor | erledigt | Rechte 20 von 20, Tausch 14 von 14, keine Datenreste. |
+| 4 | Security Advisor ohne Fehler | erledigt | 0 Fehler, 18 Warnungen, siehe unten. |
+| 5 | Ohne Anmeldung kein Zugriff; selbst registriertes Konto kein Zugriff | teils | Ohne Anmeldung: Tabellen und Funktionen lehnen ab, `hp_private` wird von der Daten-API nicht angeboten. Ein angemeldetes Konto ohne Zuordnung prüft Fall R6 in der Datenbank. **Offen:** Selbstregistrierung im Projekt ist noch eingeschaltet. |
+| 6 | Gemeinsames Projekt: Helfer-Token gegen die zweite App | **offen** | Die zweite App ist noch nicht eingespielt. |
+| 7 | Link erneuern: altes Anmeldekonto weg, kein `auth_cleanup FAILED` | **offen** | Braucht ein Orga-Konto. In der Datenbank grün (R20). |
+| 8 | Sperrzeitpunkt leeren und wieder setzen | **offen** | Über die echte Daten-API noch nicht gelaufen. In der Datenbank grün (R19). |
+| 9 | Sitzung länger als eine Stunde | **offen** |  |
+| 10 | Welche Absenderadresse die Login-Funktion sieht | erledigt | Die Adresse kommt vom Gateway. Selbst gesetzte Kopfzeilen (`CF-Connecting-IP`, `X-Forwarded-For`, `X-Real-IP`) umgehen die Begrenzung nicht. Der elfte Fehlversuch in zehn Minuten bekommt 429. |
+| 11 | Region und Verhalten bei pausiertem Projekt | teils | Region Frankfurt. Das Pausieren wurde nicht ausprobiert. |
+| 12 | Browser-Testlauf gegen die veröffentlichte Seite | **offen** | Seite liefert Version 5.0.0 ohne Skriptfehler aus. Der Durchgang mit Anmeldung fehlt. |
+
+### Die 18 Warnungen des Security Advisors
+
+Alle 18 lauten gleich: Eine Funktion mit den Rechten ihres Besitzers ist für angemeldete Konten aufrufbar. Das betrifft genau die 18 Funktionen, über die die App arbeitet, und ist die gewählte Bauweise: Die Tabellen sind für Clients vollständig gesperrt, jeder Zugriff läuft über diese Funktionen, und jede prüft beim Aufruf selbst, wer aufruft (Orga, Helfer oder niemand). Die Fälle R1 bis R20 testen das, auch für ein angemeldetes Konto, das weder Orga noch Helfer ist. Die Warnungen bleiben deshalb stehen. Fehler meldet der Advisor keine.
+
+Der Performance Advisor meldet 0 Fehler, 0 Warnungen und zwei Hinweise auf noch ungenutzte Indizes. Die Tabellen sind leer, die Hinweise sagen deshalb nichts aus.
