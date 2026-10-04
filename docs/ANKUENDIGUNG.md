@@ -17,14 +17,16 @@ Verschickt wird einzeln, zum Beispiel per WhatsApp. Die App selbst versendet nic
 >
 > {LINK}
 >
-> Einfach antippen, du bist dann gleich angemeldet. Unter „Mein Plan“ siehst du deine Schichten. Wenn dir eine nicht passt, tippst du dort auf „Tausch“ und fragst jemanden an. Die Person bekommt deine Anfrage in der App und kann annehmen oder ablehnen.
+> Einfach antippen, du bist dann gleich angemeldet. Unter „Mein Plan“ siehst du deine Schichten. Wenn dir eine nicht passt, tippst du dort auf „Tausch“ und fragst jemanden an. Die Person sieht deine Anfrage in der App und kann annehmen oder ablehnen.
 >
-> Drei Dinge dazu:
+> Ein paar Dinge dazu:
 > - Der Link gehört nur dir. Bitte nicht weitergeben, sonst kann jemand anderes in deinem Namen tauschen.
+> - Die App schickt keine Nachricht aufs Handy. Wenn du einen Tausch anfragst, sag der Person bitte kurz Bescheid, damit sie in die App schaut.
 > - Tauschen geht bis Donnerstag, 29.10., 20 Uhr. Danach bitte direkt bei mir melden.
+> - Mach dir vor dem Wochenende ein Bildschirmfoto von „Mein Plan“. Dann hast du deine Schichten auch ohne Netz.
 > - Wenn der Link nicht geht: kurz Bescheid sagen, du bekommst einen neuen.
 >
-> Datenschutz in zwei Sätzen: Im Plan stehen nur dein Vorname, dein bevorzugter Kontaktweg (ohne Nummer) und deine Schichten, sichtbar für die anderen Helfer und die Orga. Am 15.11.2026 löschen wir alles wieder.
+> Datenschutz kurz: Im Plan stehen der Name, den du mir genannt hast, dein bevorzugter Kontaktweg (ohne Nummer), ob du beim Aufbau dabei bist, und deine Schichten. Das sehen die anderen Helfer und die Orga. Spätestens am 15.11.2026 löschen wir die Helferdaten aus der App; die Orga behält eine Kopie des Plans auf ihrem eigenen Gerät. Mehr steht in der App ganz unten unter „Datenschutz“.
 >
 > Danke dir, und bis bald auf der Pista!
 > {ABSENDER}
@@ -37,17 +39,25 @@ Verschickt wird einzeln, zum Beispiel per WhatsApp. Die App selbst versendet nic
 >
 > {LINK}
 >
-> Just tap it and you're signed in. You'll find your shifts under "Mein Plan". If one doesn't work for you, tap "Tausch" there and ask someone to swap. They get your request in the app and can accept or decline. The app is in German, but it is short and the buttons are easy to guess.
+> Just tap it and you're signed in. You'll find your shifts under "Mein Plan". If one doesn't work for you, tap "Tausch" there and ask someone to swap. They see your request in the app and can accept or decline. The app is in German, but it is short and the buttons are easy to guess.
 >
-> Three things to know:
+> A few things to know:
 > - The link is yours alone. Please don't pass it on, otherwise someone else could swap shifts in your name.
+> - The app doesn't send messages to your phone. If you ask someone to swap, please tell them, so they look at the app.
 > - Swapping is open until Thursday, 29 October, 8 pm. After that, please contact me directly.
+> - Take a screenshot of "Mein Plan" before the weekend. Then you have your shifts even without a connection.
 > - If the link doesn't work, just tell me and you'll get a new one.
 >
-> Privacy in two sentences: the schedule only holds your first name, your preferred way to be contacted (no number) and your shifts, visible to the other helpers and the organisers. We delete everything on 15 November 2026.
+> Privacy in short: the schedule holds the name you gave me, your preferred way to be contacted (no number), whether you are on the set-up team, and your shifts. The other helpers and the organisers can see that. We delete the helper data from the app by 15 November 2026 at the latest; the organisers keep one copy of the schedule on their own device. There is more under "Datenschutz" at the very bottom of the app.
 >
 > Thank you, and see you on the dance floor!
 > {ABSENDER}
+
+## Wenn die Orga nach dem Verteilen etwas ändert
+
+Die App meldet Helfern nicht, wenn die Orga eine Schicht zuweist oder entfernt. Dafür diese Zeile:
+
+> Hallo {NAME}, ich habe deinen Plan geändert. Schau bitte kurz in die App unter „Mein Plan“. Danke dir!
 
 ## Kurzfassung für Nachzügler
 

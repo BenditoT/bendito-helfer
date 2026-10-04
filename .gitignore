@@ -7,3 +7,5 @@ node_modules/
 test-results/
 playwright-report/
 *.log
+# Sicherungen aus der App enthalten Namen und gehören nie ins Repository.
+bendito-helferplan-*.json
