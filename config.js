@@ -5,6 +5,6 @@
 // „Die Datenbank ist noch nicht verbunden.“
 window.HP_CONFIG = {
   version: '5.0.0',
-  supabaseUrl: '',
-  supabaseAnonKey: ''
+  supabaseUrl: 'https://pumbaojykazurlncntae.supabase.co',
+  supabaseAnonKey: 'sb_publishable_Rfc4THqxTClo3UMIk5c8Eg_FkDKpjh9'
 };
