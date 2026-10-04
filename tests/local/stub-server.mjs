@@ -67,7 +67,8 @@ function argExpr(key, type) {
     case 'boolean': return `${txt}::boolean`;
     case 'integer': return `${txt}::integer`;
     case 'bigint': return `${txt}::bigint`;
-    case 'jsonb': return j;
+    // Wie die Daten-API: Ein JSON-null wird zu SQL-NULL, auch bei jsonb-Argumenten.
+    case 'jsonb': return `nullif(${j}, 'null'::jsonb)`;
     case 'text[]': return `(case when jsonb_typeof${j} = 'array' then array(select jsonb_array_elements_text${j}) end)`;
     case 'bigint[]': return `(case when jsonb_typeof${j} = 'array' then array(select x::bigint from jsonb_array_elements_text${j} x) end)`;
     default: throw new Error('Typ nicht unterstützt: ' + type);
@@ -245,7 +246,8 @@ const server = http.createServer(async (req, res) => {
       if (p === '/auth/v1/admin/users' && req.method === 'POST') {
         const body = await readBody(req);
         const id = crypto.randomUUID();
-        psql(`insert into auth.users (id, email) values (:'i', :'e');`, { i: id, e: String(body.email) });
+        const meta = JSON.stringify({ provider: 'email', providers: ['email'], ...(body.app_metadata || {}) });
+        psql(`insert into auth.users (id, email, raw_app_meta_data, created_at) values (:'i', :'e', :'m'::jsonb, now());`, { i: id, e: String(body.email), m: meta });
         return send(res, 200, userJson(userRow('id', id)));
       }
       const m = p.match(/^\/auth\/v1\/admin\/users\/([0-9a-f-]{36})$/);

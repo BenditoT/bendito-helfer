@@ -28,8 +28,8 @@ function runSuite(file) {
 }
 
 for (const [name, file, expected] of [
-  ['Tauschtests', 'supabase/tests/t_swaps.sql', ['T1', 'T2', 'T3', 'T4', 'T5', 'T5b', 'T6', 'T6b', 'T7', 'T8', 'T9', 'T10', 'T10b']],
-  ['Rechtetests', 'supabase/tests/t_rights.sql', Array.from({ length: 17 }, (_, i) => 'R' + (i + 1))],
+  ['Tauschtests', 'supabase/tests/t_swaps.sql', ['T1', 'T2', 'T3', 'T4', 'T5', 'T5b', 'T6', 'T6b', 'T7', 'T8', 'T9', 'T10', 'T10b', 'T11']],
+  ['Rechtetests', 'supabase/tests/t_rights.sql', Array.from({ length: 20 }, (_, i) => 'R' + (i + 1))],
 ]) {
   test(name, { skip }, async (t) => {
     const results = runSuite(file);
@@ -51,9 +51,9 @@ test('Tests hinterlassen keine Daten', { skip }, () => {
 // Transaktion offen; die zweite muss warten und darf danach nichts mehr ändern.
 test('T3c gleichzeitige Annahme in zwei Sitzungen', { skip }, async () => {
   const setup = psql(['-At'], `
-    insert into auth.users (id, email) values
-      ('00000000-0000-4000-8000-0000000000a1', 'hp-c-a@helfer.bendito.invalid'),
-      ('00000000-0000-4000-8000-0000000000b1', 'hp-c-b@helfer.bendito.invalid');
+    insert into auth.users (id, email, raw_app_meta_data, created_at) values
+      ('00000000-0000-4000-8000-0000000000a1', 'hp-c-a@helfer.bendito.invalid', '{"hp": "helper"}', now()),
+      ('00000000-0000-4000-8000-0000000000b1', 'hp-c-b@helfer.bendito.invalid', '{"hp": "helper"}', now());
     insert into public.hp_helpers (id, display_name, is_test, auth_user_id) values
       ('00000000-0000-4000-8000-00000000000a', 'Test Anna C', true, '00000000-0000-4000-8000-0000000000a1'),
       ('00000000-0000-4000-8000-00000000000b', 'Test Ben C', true, '00000000-0000-4000-8000-0000000000b1');

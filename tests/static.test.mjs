@@ -11,7 +11,7 @@ import path from 'node:path';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p) => readFileSync(path.join(root, p), 'utf8');
 
-import { FORBIDDEN, SECRET_KEY, DATA_FILE } from './forbidden.mjs';
+import { FORBIDDEN, SECRET_KEY, DATA_FILE, EXPORT_MARK } from './forbidden.mjs';
 
 function walk(dir, out = []) {
   for (const name of readdirSync(path.join(root, dir))) {
@@ -36,6 +36,13 @@ test('keine verbotenen Zeichenketten im Ordner', () => {
 test('keine Datendateien und keine Altstände im Ordner', () => {
   const bad = files.filter((f) => DATA_FILE.test(f) || /helferplan\.html$/.test(f));
   assert.deepEqual(bad, []);
+});
+
+test('keine Sicherung aus der App im Ordner, auch nicht umbenannt', () => {
+  const bad = textFiles.filter((f) => /\.(json|txt)$/i.test(f) && EXPORT_MARK.test(read(f)));
+  assert.deepEqual(bad, []);
+  assert.ok(DATA_FILE.test('bendito-helferplan-2026-11-02.json'), 'Dateiname der Sicherung wird nicht erkannt');
+  assert.ok(DATA_FILE.test('docs/bendito-helferplan-2026-11-02 (1).json'), 'Kopie der Sicherung wird nicht erkannt');
 });
 
 test('kein Schlüssel mit Dienstrechten in irgendeiner Datei', () => {
@@ -144,7 +151,7 @@ test('Version steht überall gleich', () => {
 
 test('.gitignore hält Datendateien fern', () => {
   const gi = read('.gitignore').split('\n').map((l) => l.trim());
-  for (const p of ['*.csv', '*.xlsx', '*.pdf', '*.env', '.DS_Store', 'node_modules/', 'test-results/']) assert.ok(gi.includes(p), p);
+  for (const p of ['*.csv', '*.xlsx', '*.pdf', '*.env', '.DS_Store', 'node_modules/', 'test-results/', 'bendito-helferplan-*.json']) assert.ok(gi.includes(p), p);
 });
 
 test('Migrationen: jede Funktion mit leerem search_path, keine offene Policy', () => {
@@ -154,12 +161,16 @@ test('Migrationen: jede Funktion mit leerem search_path, keine offene Policy', (
     const sql = read(path.join(dir, f));
     assert.ok(!/using\s*\(\s*true\s*\)/i.test(sql), f + ': offene Policy');
     assert.ok(!/grant\s+[^;]*\bto\s+(public|anon)\b/i.test(sql), f + ': Recht für anon oder public');
-    for (const m of sql.matchAll(/create or replace function public\.(hp_\w+)\s*\(([\s\S]*?)\n\$\$;/g)) {
+    for (const m of sql.matchAll(/create or replace function (public\.hp_\w+|hp_private\.\w+)\s*\(([\s\S]*?)\n\$\$;/g)) {
       fns += 1;
       assert.match(m[0], /set search_path = ''/, f + ': ' + m[1] + ' ohne festen search_path');
     }
+    // Jede Funktion gehört in eines der beiden Schemata, nie in ein anderes.
+    for (const m of sql.matchAll(/create (?:or replace )?function\s+([\w.]+)/g)) {
+      assert.match(m[1], /^(public\.hp_\w+|hp_private\.\w+)$/, f + ': Funktion an unerwartetem Ort: ' + m[1]);
+    }
   }
-  assert.ok(fns >= 30, 'nur ' + fns + ' Funktionen gefunden');
+  assert.ok(fns >= 35, 'nur ' + fns + ' Funktionen gefunden');
 });
 
 test('Edge Function: keine Geheimnisse im Quelltext, keine Codes im Log', () => {
@@ -169,6 +180,16 @@ test('Edge Function: keine Geheimnisse im Quelltext, keine Codes im Log', () => 
     assert.match(m[2], /^"[^"$]*"$/, 'Log mit Variable: ' + m[0]);
   }
   assert.match(ts, /Deno\.env\.get\("SUPABASE_SERVICE_ROLE_KEY"\)/);
+  // Die Funktion ist der Login selbst: ohne JWT-Prüfung des Gateways bereitstellen.
+  assert.match(read('supabase/config.toml'), /\[functions\.hp-login\]\s*\nverify_jwt = false/);
+});
+
+test('app.js: abgelaufenes Token wird einmal erneuert, überholte Abrufe werden verworfen', () => {
+  const js = read('app.js');
+  assert.match(js, /e\.status !== 401/);
+  assert.equal((js.match(/refreshSession\(\)/g) || []).length, 1);
+  assert.match(js, /seq !== live\.current\.seq/);
+  assert.match(js, /refresh\(true\)/);
 });
 
 test('Testdaten sind synthetisch', () => {

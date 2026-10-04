@@ -10,9 +10,13 @@
 //           HP_PGDATABASE=hp_e2e node tests/local/stub-server.mjs
 //   live:   HP_BASE_URL=https://benditot.github.io/bendito-helfer/ \
 //           HP_ADMIN_EMAIL=… HP_ADMIN_PASSWORD=… node tests/e2e/testlauf.cjs
-// Voraussetzung in beiden Fällen: die Testhelfer „Test Anna“ und „Test Ben“
-// existieren (supabase/tests/seed_test_helpers.sql) und haben keine Schichten.
-// Der Lauf endet mit „Testdaten entfernen“.
+// Voraussetzung in beiden Fällen: die Testhelfer „Test Anna“, „Test Ben“ und
+// „Test Cleo“ existieren (supabase/tests/seed_test_helpers.sql) und haben keine
+// Schichten. Der Lauf endet mit „Testdaten entfernen“.
+//
+// Der Lauf schaltet die Tauschsperre um und ändert kurz den Sperrzeitpunkt. Er
+// bricht deshalb sofort ab, wenn im Ziel ein Helfer existiert, der kein
+// Testhelfer ist: Mit echten Helfern läuft er nicht.
 const path = require('node:path');
 const fs = require('node:fs');
 let chromium;
@@ -20,6 +24,7 @@ try { ({ chromium } = require('playwright')); }
 catch (e) { ({ chromium } = require('/opt/npm-tools/node_modules/playwright')); }
 
 const BASE = process.env.HP_BASE_URL || 'http://127.0.0.1:4173/';
+const LOCAL = /^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?\//.test(BASE);
 const ADMIN_EMAIL = process.env.HP_ADMIN_EMAIL || 'orga@test.invalid';
 const ORGA_PW = process.env.HP_ADMIN_PASSWORD || 'lokal-orga-passwort';
 const OUT = process.env.HP_SHOTS || path.join(__dirname, '../../test-results/testlauf');
@@ -120,6 +125,13 @@ async function makeLink(page, helperName) {
   await page.getByRole('button', { name: 'Fertig' }).click();
   return url;
 }
+// Liegt das Element vollständig im sichtbaren Bereich des Fensters?
+const inViewport = (page, selector) => page.evaluate((sel) => {
+  const el = document.querySelector(sel);
+  if (!el) return false;
+  const r = el.getBoundingClientRect();
+  return r.width > 0 && r.height > 0 && r.top >= 0 && r.left >= 0 && r.bottom <= window.innerHeight && r.right <= window.innerWidth;
+}, selector);
 const planShifts = (page) => page.locator('.plan-shift').evaluateAll((els) => els.map((e) => e.getAttribute('data-shift')).sort());
 const sessionToken = (page) => page.evaluate(() => { try { return JSON.parse(localStorage.getItem('hp-auth')).access_token; } catch (e) { return null; } });
 
@@ -129,6 +141,7 @@ const sessionToken = (page) => page.evaluate(() => { try { return JSON.parse(loc
   const anna = await newProfile(browser, 'anna', { width: 390, height: 844 }, true);
   const ben = await newProfile(browser, 'ben', { width: 1024, height: 768 });
   let annaLink = '', benLink = '', annaLinkOld = '';
+  let onlyTestHelpers = false;
 
   await step('0 Orga meldet sich an; Version 5.0.0 im Fuß', async () => {
     await adminLogin(orga.page);
@@ -138,7 +151,21 @@ const sessionToken = (page) => page.evaluate(() => { try { return JSON.parse(loc
     expect(names.some((n) => n.includes('Test Anna')) && names.some((n) => n.includes('Test Ben')), 'Testhelfer fehlen: ' + names.join(' | '));
     expect((await orga.page.locator('.stat-pill').innerText()).startsWith('0/'), 'Plan ist nicht leer');
     await shot(orga.page, 'orga-board-leer');
+    // Schutz: nur Testhelfer im Ziel, sonst wird nichts angefasst.
+    await openView(orga.page, 'settings');
+    const rows = await orga.page.locator('.mini-h').count();
+    const tests = await orga.page.locator('.mini-h:has(.tag.test)').count();
+    onlyTestHelpers = rows > 0 && rows === tests;
+    expect(onlyTestHelpers, 'Im Ziel gibt es ' + (rows - tests) + ' Helfer, die keine Testhelfer sind. Der Testlauf läuft nicht mit echten Helfern.');
+    await openView(orga.page, 'board');
+    return rows + ' Helfer, alle Testhelfer';
   });
+  if (!onlyTestHelpers) {
+    await browser.close();
+    fs.writeFileSync(path.join(OUT, 'ergebnis.json'), JSON.stringify({ base: BASE, at: new Date().toISOString(), results }, null, 2));
+    console.log('\nAbbruch vor der ersten Änderung: Anmeldung fehlgeschlagen oder echte Helfer im Ziel.');
+    process.exit(1);
+  }
 
   await step('1 Orga weist Anna und Ben je zwei Schichten zu', async () => {
     await assign(orga.page, 'Test Anna', 'f06a');
@@ -161,6 +188,87 @@ const sessionToken = (page) => page.evaluate(() => { try { return JSON.parse(loc
     await dlg.getByRole('button', { name: 'Abbrechen' }).click();
     expect(await card(orga.page, 'f07').locator('.person').count() === 0, 'trotzdem zugewiesen');
     await orga.page.keyboard.press('Escape');
+  });
+
+  await step('1c Orga entfernt eine Zuweisung: Rückmeldung mit Erinnerung, Bescheid zu sagen', async () => {
+    await assign(orga.page, 'Test Cleo', 'f07');
+    await card(orga.page, 'f07').locator('.person', { hasText: 'Test Cleo' }).waitFor({ timeout: 8000 });
+    await orga.page.keyboard.press('Escape');
+    await card(orga.page, 'f07').locator('.person .rm').click();
+    const toast = orga.page.locator('[data-toast="notice"]');
+    await toast.waitFor({ timeout: 8000 });
+    const text = await toast.innerText();
+    expect(/Test Cleo ist aus Fr 18:00 .* entfernt/.test(text) && /Bescheid/.test(text), 'Rückmeldung: ' + text);
+    // Die Meldung erscheint, sobald der Server geantwortet hat; die Karte folgt mit dem Neuladen.
+    await until(async () => (await card(orga.page, 'f07').locator('.person').count()) === 0, 8000, 'Zuweisung verschwindet von der Karte');
+    await toast.getByRole('button', { name: 'Schließen' }).click();
+    expect(await toast.count() === 0, 'Meldung lässt sich nicht schließen');
+  });
+
+  await step('1d Haken „Testhelfer“ springt nach dem Anlegen zurück', async () => {
+    await openView(orga.page, 'settings');
+    await orga.page.locator('#ad-name').fill('Test Dora');
+    await orga.page.locator('#ad-test').check();
+    await orga.page.locator('.s-block', { hasText: 'Helfer anlegen' }).getByRole('button', { name: 'Anlegen', exact: true }).click();
+    await orga.page.locator('.mini-h[data-helper="Test Dora"] .tag.test').waitFor({ timeout: 8000 });
+    expect(!(await orga.page.locator('#ad-test').isChecked()), 'Haken „Testhelfer“ ist noch gesetzt');
+    expect(await orga.page.locator('#ad-name').inputValue() === '', 'Namensfeld nicht geleert');
+    await orga.page.locator('#bulk-names').fill('Test Emil');
+    await orga.page.locator('#bulk-test').check();
+    await orga.page.getByRole('button', { name: 'Alle anlegen' }).click();
+    await orga.page.locator('.mini-h[data-helper="Test Emil"] .tag.test').waitFor({ timeout: 8000 });
+    expect(!(await orga.page.locator('#bulk-test').isChecked()), 'Haken „als Testhelfer“ ist noch gesetzt');
+  });
+
+  await step('1e Fehler im Dialog: Meldung steht unter dem Dialog und verdeckt nichts, Fokus bleibt im Dialog', async () => {
+    await orga.page.setViewportSize({ width: 390, height: 664 });
+    await openView(orga.page, 'settings');
+    await orga.page.locator('.mini-h[data-helper="Test Emil"]').getByRole('button', { name: 'Bearbeiten' }).click();
+    const dlg = orga.page.getByRole('dialog');
+    await dlg.waitFor();
+    await dlg.locator('#hf-name').fill('Test Dora');
+    await dlg.getByRole('button', { name: 'Speichern' }).click();
+    // Auf genau diese Meldung warten: Die Erfolgsmeldung aus dem Schritt davor kann noch stehen.
+    await orga.page.locator('.overlay [data-toast="notice"]', { hasText: 'Diesen Namen gibt es schon' }).waitFor({ timeout: 8000 });
+    const geo = await orga.page.evaluate(() => {
+      const t = document.querySelector('.overlay [data-toast="notice"]').getBoundingClientRect();
+      const p = document.querySelector('.overlay .popup').getBoundingClientRect();
+      const b = Array.from(document.querySelectorAll('.overlay .popup .dlg-actions button')).map((x) => x.getBoundingClientRect());
+      return { gap: Math.round(t.top - p.bottom), toastInView: t.bottom <= window.innerHeight, popupInView: p.top >= 0,
+        buttonsFree: b.every((r) => r.bottom <= t.top), focusInDialog: !!document.activeElement.closest('[role="dialog"]') };
+    });
+    expect(geo.gap >= 0 && geo.buttonsFree, 'Meldung verdeckt den Dialog: ' + JSON.stringify(geo));
+    expect(geo.toastInView && geo.popupInView, 'Dialog oder Meldung ragt aus dem Bildschirm: ' + JSON.stringify(geo));
+    expect(geo.focusInDialog, 'Fokus ist aus dem Dialog gefallen');
+    await shot(orga.page, 'orga-fehler-im-dialog');
+    await dlg.getByRole('button', { name: 'Abbrechen' }).click();
+    await orga.page.setViewportSize({ width: 1280, height: 900 });
+    const stay = orga.page.locator('[data-toast="notice"]');
+    if (await stay.count()) await stay.getByRole('button', { name: 'Schließen' }).click();
+  });
+
+  await step('1f Ein überholter Abruf überschreibt den Stand nach einer eigenen Änderung nicht', async () => {
+    await openView(orga.page, 'board');
+    let held = null, taken = false;
+    await orga.ctx.route('**/rest/v1/rpc/hp_state', async (route) => {
+      if (!taken) { taken = true; const resp = await route.fetch(); held = { route, resp }; return; }
+      await route.continue();
+    });
+    // Abruf A startet und bleibt mit dem alten Stand unterwegs hängen.
+    await until(async () => { await orga.page.evaluate(() => window.dispatchEvent(new Event('focus'))); return !!held; }, LIMIT, 'Abruf A abgefangen');
+    // Eigene Änderung: Danach muss ein neuer Abruf B den Stand liefern, nicht A.
+    await assign(orga.page, 'Test Cleo', 'f07');
+    await card(orga.page, 'f07').locator('.person', { hasText: 'Test Cleo' }).waitFor({ timeout: 8000 });
+    await held.route.fulfill({ response: held.resp });
+    // Kein Warten auf etwas, das kommen soll: Hier darf sich nichts mehr ändern.
+    await orga.page.waitForTimeout(700);
+    expect(await card(orga.page, 'f07').locator('.person').count() === 1, 'der überholte Abruf hat die Zuweisung wieder ausgeblendet');
+    expect(await statusOk(orga.page).count() === 1, 'Statuszeile ist nicht grün');
+    await orga.ctx.unroute('**/rest/v1/rpc/hp_state');
+    await orga.page.keyboard.press('Escape');
+    await card(orga.page, 'f07').locator('.person .rm').click();
+    await until(async () => (await card(orga.page, 'f07').locator('.person').count()) === 0, 8000, 'Aufräumen: Zuweisung entfernt');
+    await orga.page.locator('[data-toast="notice"]').getByRole('button', { name: 'Schließen' }).click();
   });
 
   await step('2 Anna und Ben öffnen ihre Links und sehen ihre Schichten', async () => {
@@ -210,25 +318,56 @@ const sessionToken = (page) => page.evaluate(() => { try { return JSON.parse(loc
   });
 
   await step('3 Anna fragt Tausch mit Bens Schicht an; Ben nimmt an', async () => {
-    await openView(anna.page, 'myplan');
-    await anna.page.locator('.plan-shift[data-shift="f06a"] .swap-btn').click();
+    // Auf dem Telefon vom Board aus: Die Karte liegt weiter unten, die Seite ist gescrollt.
+    await openView(anna.page, 'board');
+    await anna.page.locator('.nav-d', { hasText: 'Fr' }).first().click();
+    await card(anna.page, 'f06a').evaluate((el) => el.scrollIntoView({ block: 'start' }));
+    const scrolled = await anna.page.evaluate(() => Math.round(window.scrollY));
+    expect(scrolled > 100, 'Seite ist nicht gescrollt (' + scrolled + ' px), die Prüfung wäre wertlos');
+    await card(anna.page, 'f06a').locator('.swap-btn').click();
     const dlg = anna.page.getByRole('dialog');
     await dlg.waitFor();
     // Sa 10:00 Brunch überschneidet Annas Sa 10:00 Bar und darf nicht wählbar sein.
     expect(await dlg.locator('option[value="s01"]').isDisabled(), 'überschneidende Schicht ist wählbar');
     expect(!(await dlg.locator('option[value="f08a"]').isDisabled()), 'Bens Schicht ist nicht wählbar');
+    expect(/00:30 \(Nacht auf Sa\)/.test(await dlg.locator('option[value="f13a"]').innerText()), 'Nachtschicht ohne Vermerk in der Auswahl');
     await dlg.locator('select').selectOption('f08a');
     await dlg.locator('textarea').fill('Testlauf');
     await shot(anna.page, 'anna-tausch-anfragen');
     await dlg.getByRole('button', { name: 'Anfrage senden' }).click();
-    await anna.page.locator('.notice.info').waitFor({ timeout: 8000 });
-    const ms = await until(async () => (await ben.page.locator('[data-view="myswaps"] .badge').count()) > 0, LIMIT, 'Anfrage bei Ben sichtbar');
+    const sentAt = Date.now();
+    const toast = anna.page.locator('[data-toast="notice"]');
+    await toast.waitFor({ timeout: 8000 });
+    const said = await toast.innerText();
+    expect(/Sag Test Ben kurz Bescheid/.test(said), 'Meldung nennt nicht, wem Bescheid zu sagen ist: ' + said);
+    // Die Meldung ist zu sehen, obwohl die Seite gescrollt ist.
+    expect(await anna.page.evaluate(() => window.scrollY) > 100, 'Seite ist zurückgesprungen');
+    expect(await inViewport(anna.page, '[data-toast="notice"]'), 'Meldung liegt außerhalb des sichtbaren Bereichs');
+    await shot(anna.page, 'anna-meldung-trotz-scrollen');
+    // Die eigene offene Anfrage ist an der Schicht markiert, auf dem Board und im Plan.
+    await card(anna.page, 'f06a').locator('.card-swap-out').waitFor({ timeout: 8000 });
+    expect(/Fr 19:00/.test(await card(anna.page, 'f06a').locator('.card-swap-out').innerText()), 'Markierung auf der Karte nennt das Ziel nicht');
+    await openView(anna.page, 'myplan');
+    expect(/Tausch angefragt/.test(await anna.page.locator('.plan-shift[data-shift="f06a"]').innerText()), 'Markierung im Plan fehlt');
+    // Die Orga will Anna aus genau dieser Schicht nehmen: Die App fragt vorher nach.
+    await openView(orga.page, 'board');
+    await orga.page.locator('.nav-d', { hasText: 'Fr' }).first().click();
+    await until(async () => (await card(orga.page, 'f08a').locator('.card-swap-in').count()) > 0, LIMIT, 'Anfrage bei der Orga sichtbar');
+    await card(orga.page, 'f06a').locator('.person .rm').click();
+    const ask = orga.page.getByRole('dialog');
+    await ask.waitFor({ timeout: 8000 });
+    expect(/offene Tauschanfrage/i.test(await ask.innerText()), 'Rückfrage fehlt: ' + await ask.innerText());
+    await ask.getByRole('button', { name: 'Abbrechen' }).click();
+    expect(await card(orga.page, 'f06a').locator('.person', { hasText: 'Test Anna' }).count() === 1, 'trotz Abbrechen entfernt');
+    // Die Frist zählt ab dem Absenden, nicht ab hier.
+    await until(async () => (await ben.page.locator('[data-view="myswaps"] .badge').count()) > 0, Math.max(1000, LIMIT - (Date.now() - sentAt)), 'Anfrage bei Ben sichtbar');
+    const ms = Date.now() - sentAt;
     await openView(ben.page, 'myswaps');
     await shot(ben.page, 'ben-anfrage');
     await ben.page.locator('.sw-yes').click();
     await ben.page.getByRole('dialog').getByRole('button', { name: 'Tauschen' }).click();
     await ben.page.locator('.notice.info').waitFor({ timeout: 8000 });
-    return 'Anfrage bei Ben nach ' + (ms / 1000).toFixed(1) + ' s';
+    return 'Anfrage bei Ben sichtbar, geprüft ' + (ms / 1000).toFixed(1) + ' s nach dem Absenden';
   });
 
   await step('4 Beide Pläne und das Board zeigen den Tausch, auch nach Neuladen', async () => {
@@ -293,10 +432,12 @@ const sessionToken = (page) => page.evaluate(() => { try { return JSON.parse(loc
     expect(/Keine Verbindung – letzter Stand \d\d:\d\d:\d\d, Änderungen gesperrt/.test(text), 'Statuszeile: ' + text);
     expect(await ben.page.locator('.plan-shift .swap-btn').first().isDisabled(), 'Tausch-Knopf ist nicht gesperrt');
     expect((await planShifts(ben.page)).length === 2, 'letzter Stand nicht mehr sichtbar');
+    expect(await inViewport(ben.page, '[data-toast="conn"]'), 'Hinweis „keine Verbindung“ unten fehlt');
     await shot(ben.page, 'ben-offline');
     await ben.ctx.setOffline(false);
     const back = await until(async () => (await statusOk(ben.page).count()) > 0, LIMIT, 'wieder grün');
     expect(!(await ben.page.locator('.plan-shift .swap-btn').first().isDisabled()), 'Knopf bleibt gesperrt');
+    expect(await ben.page.locator('[data-toast="conn"]').count() === 0, 'Hinweis unten bleibt stehen');
     ben.netNoise.length = 0; // Offline war Absicht
     return 'rot nach ' + (ms / 1000).toFixed(1) + ' s, grün nach ' + (back / 1000).toFixed(1) + ' s';
   });
@@ -352,6 +493,46 @@ const sessionToken = (page) => page.evaluate(() => { try { return JSON.parse(loc
     await until(async () => JSON.stringify(await planShifts(ben.page)) === JSON.stringify(['f06a', 's02a']), LIMIT, 'Bens Plan nach Tastatur-Tausch');
   });
 
+  await step('6e Zugriffstoken abgelaufen: App erneuert die Sitzung selbst, eine Änderung geht genau einmal durch', async () => {
+    if (!LOCAL) return 'nur im lokalen Nachbau prüfbar, übersprungen';
+    const before = {};
+    for (const p of [orga, anna, ben]) before[p.name] = await sessionToken(p.page);
+    const r = await fetch(new URL('__stub/expire-access-tokens', BASE), { method: 'POST' });
+    expect(r.ok, 'Nachbau hat die Token nicht entwertet');
+    // Orga ändert etwas mit dem entwerteten Token: abgewiesen, erneuert, wiederholt.
+    await assign(orga.page, 'Test Cleo', 'f07');
+    await card(orga.page, 'f07').locator('.person', { hasText: 'Test Cleo' }).waitFor({ timeout: 8000 });
+    expect(await card(orga.page, 'f07').locator('.person').count() === 1, 'Zuweisung doppelt oder gar nicht ausgeführt');
+    expect(await orga.page.locator('[data-toast="notice"].err').count() === 0, 'Fehlermeldung trotz Erneuerung');
+    for (const p of [anna, ben]) await p.page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    for (const p of [orga, anna, ben]) {
+      await until(async () => { const t = await sessionToken(p.page); return t && t !== before[p.name]; }, LIMIT, 'neue Sitzung bei ' + p.name);
+      expect(await p.page.locator('.login-box').count() === 0, p.name + ' wurde abgemeldet');
+      await statusOk(p.page).waitFor({ timeout: LIMIT });
+    }
+    await openView(ben.page, 'myplan');
+    expect((await planShifts(ben.page)).length === 2, 'Bens Plan fehlt nach der Erneuerung');
+    // Aufräumen.
+    await orga.page.keyboard.press('Escape');
+    await card(orga.page, 'f07').locator('.person .rm').click();
+    await until(async () => (await card(orga.page, 'f07').locator('.person').count()) === 0, 8000, 'Aufräumen: Zuweisung entfernt');
+    for (const p of [orga, anna, ben]) p.netNoise.length = 0; // die abgewiesenen Abrufe waren Absicht
+  });
+
+  await step('6f Datenschutz-Hinweis und Nachtschicht-Vermerk auf dem Telefon', async () => {
+    await openView(anna.page, 'board');
+    await anna.page.locator('.nav-d', { hasText: 'Fr' }).first().click();
+    expect((await card(anna.page, 'f13a').locator('.card-night').innerText()) === 'Nacht auf Sa', 'Vermerk an der Nachtschicht fehlt');
+    await anna.page.locator('.footer-link').click();
+    const dlg = anna.page.getByRole('dialog');
+    await dlg.waitFor();
+    const text = await dlg.innerText();
+    expect(/Was gespeichert wird/.test(text) && /Protokoll/.test(text) && /15\.11\.2026/.test(text), 'Datenschutz-Text unvollständig');
+    await shot(anna.page, 'anna-datenschutz');
+    await anna.page.keyboard.press('Escape');
+    expect(await anna.page.getByRole('dialog').count() === 0, 'Dialog schließt nicht');
+  });
+
   await step('6d Telefonbreite 390 px: kein waagerechtes Scrollen, Tippziele ab 44 px', async () => {
     const report = [];
     for (const view of ['board', 'myplan', 'myswaps', 'inbox', 'helpers', 'howto']) {
@@ -385,7 +566,7 @@ const sessionToken = (page) => page.evaluate(() => { try { return JSON.parse(loc
   await step('7 Tausch sperren: Anfrage nicht mehr möglich', async () => {
     await openView(orga.page, 'settings');
     await orga.page.locator('#st-locked').check();
-    await orga.page.locator('.notice.info').waitFor({ timeout: 8000 });
+    await orga.page.locator('[data-toast="notice"]', { hasText: 'Tausch gesperrt.' }).waitFor({ timeout: 8000 });
     await openView(ben.page, 'myplan');
     const ms = await until(async () => (await ben.page.locator('.plan-shift .swap-btn').count()) === 0, LIMIT, 'Tausch-Knöpfe verschwinden bei Ben');
     expect(/Tausch ist gesperrt/.test(await ben.page.locator('.my-plan').innerText()), 'Hinweis fehlt');
@@ -401,8 +582,66 @@ const sessionToken = (page) => page.evaluate(() => { try { return JSON.parse(loc
     expect(direct && direct.code === 'SWAP_LOCKED', 'direkter Aufruf: ' + JSON.stringify(direct));
     await shot(ben.page, 'ben-tausch-gesperrt');
     await orga.page.locator('#st-locked').uncheck();
-    await orga.page.locator('.notice.info').waitFor({ timeout: 8000 });
+    await orga.page.locator('[data-toast="notice"]', { hasText: 'gelöst' }).waitFor({ timeout: 8000 });
     return 'bei Ben nach ' + (ms / 1000).toFixed(1) + ' s';
+  });
+
+  await step('7b Sperrzeitpunkt setzen und wieder leeren (leerer Wert kommt beim Server an)', async () => {
+    await openView(orga.page, 'settings');
+    const inp = orga.page.locator('#st-lockat');
+    const save = orga.page.locator('.s-block', { hasText: 'Schichttausch' }).getByRole('button', { name: 'Speichern' });
+    const toast = orga.page.locator('[data-toast="notice"]');
+    const original = await inp.inputValue();
+    await inp.fill('2031-01-01T10:00');
+    await save.click();
+    await until(async () => /Sperrzeitpunkt gespeichert/.test(await toast.innerText().catch(() => '')), 8000, 'Sperrzeitpunkt gespeichert');
+    await inp.fill('');
+    await save.click();
+    await until(async () => /Sperrzeitpunkt entfernt/.test(await toast.innerText().catch(() => '')), 8000, 'Sperrzeitpunkt entfernt');
+    expect(await orga.page.locator('[data-toast="notice"].err').count() === 0, 'Fehler beim Leeren');
+    await orga.page.reload();
+    await statusOk(orga.page).waitFor({ timeout: LIMIT });
+    await openView(orga.page, 'settings');
+    expect(await orga.page.locator('#st-lockat').inputValue() === '', 'Sperrzeitpunkt ist nach dem Leeren noch gesetzt');
+    if (original) {
+      await orga.page.locator('#st-lockat').fill(original);
+      await orga.page.locator('.s-block', { hasText: 'Schichttausch' }).getByRole('button', { name: 'Speichern' }).click();
+      await until(async () => /Sperrzeitpunkt gespeichert/.test(await orga.page.locator('[data-toast="notice"]').innerText().catch(() => '')), 8000, 'ursprünglicher Sperrzeitpunkt wieder gesetzt');
+    }
+    return original ? 'ursprünglicher Wert wieder gesetzt' : 'vorher leer, wieder leer';
+  });
+
+  await step('7c Nach dem Event erinnert die App die Orga an Sperren und Löschen', async () => {
+    const call = (key, value) => orga.page.evaluate(async ([k, v]) => {
+      const tok = JSON.parse(localStorage.getItem('hp-auth')).access_token;
+      const cfg = window.HP_CONFIG;
+      const r = await fetch(cfg.supabaseUrl + '/rest/v1/rpc/' + (k ? 'hp_admin_set_setting' : 'hp_state'), {
+        method: 'POST', headers: { 'Content-Type': 'application/json', apikey: cfg.supabaseAnonKey, Authorization: 'Bearer ' + tok },
+        body: JSON.stringify(k ? { p_key: k, p_value: v } : {}),
+      });
+      return r.json();
+    }, [key, value]);
+    const poke = () => orga.page.evaluate(() => window.dispatchEvent(new Event('focus')));
+    const banner = orga.page.locator('[data-reminder]');
+    const original = (await call(null)).settings;
+    expect(await banner.count() === 0, 'Erinnerung steht schon vor dem Event da');
+    try {
+      expect((await call('event_end', '2026-01-01T00:00:00Z')).ok, 'Eventende ließ sich nicht setzen');
+      await until(async () => { await poke(); return (await banner.count()) > 0; }, LIMIT, 'Erinnerung nach dem Eventende');
+      expect(/Das Event ist vorbei/.test(await banner.innerText()) && /Login-Links sperren/.test(await banner.innerText()), 'Text: ' + await banner.innerText());
+      expect((await call('purge_after', '2026-01-02')).ok, 'Löschtermin ließ sich nicht setzen');
+      await until(async () => { await poke(); return /Löschtermin \(02\.01\.2026\) ist erreicht/.test(await banner.innerText().catch(() => '')); }, LIMIT, 'Erinnerung am Löschtermin');
+      await shot(orga.page, 'orga-erinnerung');
+      await openView(orga.page, 'board');
+      await banner.getByRole('button', { name: 'Zu den Einstellungen' }).click();
+      expect(await orga.page.locator('.tab.on').getAttribute('data-view') === 'settings', 'Knopf führt nicht zu den Einstellungen');
+    } finally {
+      await call('event_end', original.event_end);
+      await call('purge_after', original.purge_after);
+    }
+    await until(async () => { await poke(); return (await banner.count()) === 0; }, LIMIT, 'Erinnerung verschwindet nach dem Zurücksetzen');
+    const now = (await call(null)).settings;
+    expect(now.event_end === original.event_end && now.purge_after === original.purge_after, 'Einstellungen nicht zurückgesetzt');
   });
 
   await step('8a Druckansicht und Sicherung als Datei', async () => {
@@ -431,6 +670,8 @@ const sessionToken = (page) => page.evaluate(() => { try { return JSON.parse(loc
   await step('8b „Testdaten entfernen“: Plan ist leer, Testhelfer sind draußen', async () => {
     await openView(orga.page, 'settings');
     await orga.page.getByRole('button', { name: 'Testdaten entfernen' }).click();
+    const sure = await orga.page.getByRole('dialog').innerText();
+    expect(['Test Anna', 'Test Ben', 'Test Cleo', 'Test Dora', 'Test Emil'].every((n) => sure.includes(n)) && /Entfernt 5 Testhelfer/.test(sure), 'Dialog nennt nicht, wer entfernt wird: ' + sure);
     await orga.page.getByRole('dialog').getByRole('button', { name: 'Testdaten entfernen' }).click();
     await orga.page.locator('.notice.info').waitFor({ timeout: 8000 });
     await until(async () => (await orga.page.locator('.stat-pill').innerText()).startsWith('0/'), LIMIT, 'Plan leer');

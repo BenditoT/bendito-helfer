@@ -18,11 +18,14 @@ end $$;
 
 create schema if not exists auth;
 
+-- Wie im echten Projekt: created_at hat keinen Vorgabewert (der Auth-Dienst setzt
+-- es selbst), die App-Metadaten liegen in raw_app_meta_data.
 create table if not exists auth.users (
   id uuid primary key default gen_random_uuid(),
   email text unique,
   encrypted_password text,
-  created_at timestamptz not null default now()
+  raw_app_meta_data jsonb,
+  created_at timestamptz
 );
 
 create or replace function auth.uid()

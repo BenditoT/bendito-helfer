@@ -4,7 +4,7 @@
 //
 // Prüft die versionierten Dateien UND die gesamte Historie auf
 //   * verbotene Zeichenketten und geheime Schlüssel,
-//   * Datendateien (.csv, .xlsx, .pdf, .env),
+//   * Datendateien (.csv, .xlsx, .pdf, .env) und Sicherungen aus der App,
 //   * die Helfernamen, das Orga-Passwort und die Tabellen-Kennung aus dem Altstand.
 // Die Werte aus dem Altstand werden zur Laufzeit lokal gelesen und nie ausgegeben:
 // gemeldet wird nur, ob und wo es einen Treffer gibt.
@@ -15,7 +15,7 @@ import { spawnSync } from 'node:child_process';
 import { readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { FORBIDDEN, SECRET_KEY, DATA_FILE } from './forbidden.mjs';
+import { FORBIDDEN, SECRET_KEY, DATA_FILE, EXPORT_MARK } from './forbidden.mjs';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const oldFile = process.env.HP_ALTDATEI || path.resolve(root, '..', 'bendito helfer orga', 'bendito-helferplan.html');
@@ -39,8 +39,14 @@ const skipped = [...block.matchAll(/name:'([^']+)'/g)].length - names.length;
 if (names.length < 5) { console.error('Im Altstand wurden nur ' + names.length + ' Namen gefunden. Prüfung abgebrochen.'); process.exit(2); }
 const secrets = [];
 for (const [id, label] of [[FORBIDDEN[0], 'Orga-Passwort'], [FORBIDDEN[1], 'Tabellen-Kennung']]) {
-  const m = old.match(new RegExp('var ' + id + "\\s*=\\s*'([^']{4,})'"));
-  if (m) secrets.push({ value: m[1], label });
+  const m = old.match(new RegExp('var ' + id + "\\s*=\\s*'([^']+)'"));
+  if (!m) { console.error(label + ' im Altstand nicht gefunden. Prüfung abgebrochen.'); process.exit(2); }
+  // Kurze Werte nur als eigenständiges Wort suchen, sonst trifft jede zufällige Silbe.
+  const value = m[1];
+  const re = value.length < 6
+    ? new RegExp('(?<![\\p{L}\\p{N}])' + value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?![\\p{L}\\p{N}])', 'u')
+    : null;
+  secrets.push({ label, test: (line) => (re ? re.test(line) : line.includes(value)) });
 }
 
 const esc = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -54,12 +60,13 @@ function scan(text, where) {
     const raw = lines[i];
     for (const s of FORBIDDEN) if (raw.includes(s)) problems.push(where(i) + ': verbotene Zeichenkette');
     if (SECRET_KEY.test(raw)) problems.push(where(i) + ': geheimer Schlüssel');
+    if (EXPORT_MARK.test(raw)) problems.push(where(i) + ': Sicherung aus der App (enthält Namen)');
     for (const m of raw.matchAll(/eyJ[A-Za-z0-9_-]{10,}\.(eyJ[A-Za-z0-9_-]{10,})\.[A-Za-z0-9_-]+/g)) {
       let role = '?';
       try { role = JSON.parse(Buffer.from(m[1], 'base64url').toString('utf8')).role || '?'; } catch { /* kein lesbares Token */ }
       if (role !== 'anon') problems.push(where(i) + ': Token mit anderen als anon-Rechten');
     }
-    for (const sec of secrets) if (raw.includes(sec.value)) problems.push(where(i) + ': ' + sec.label + ' aus dem Altstand');
+    for (const sec of secrets) if (sec.test(raw)) problems.push(where(i) + ': ' + sec.label + ' aus dem Altstand');
     const masked = maskSynthetic(raw);
     if (nameRes.some((re) => re.test(masked))) problems.push(where(i) + ': Name aus dem Altstand');
   }
