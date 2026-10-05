@@ -4,6 +4,9 @@
 -- bricht der Block mit dem Ergebnis ab und rollt damit auch die Testdaten
 -- zurück. Das Ergebnis steht in der Fehlermeldung nach „HP_TEST_RESULTS“.
 -- Rollenwechsel über SET ROLE (anon, authenticated) und die JWT-Angaben.
+--
+-- Nur bei leerer Helfertabelle: Sonst bricht der Block sofort ab, ohne etwas zu
+-- ändern. Für eine Prüfung im laufenden Betrieb gibt es check_rechte.sql.
 
 do $$
 declare
@@ -40,6 +43,11 @@ declare
   v_swap bigint;
   f record;
 begin
+  -- Die Fälle zählen Zeilen. Stehen schon Helfer in der Datenbank, würden mehrere
+  -- Fälle rot, obwohl alles stimmt. Dann lieber gar nicht laufen.
+  if exists (select 1 from public.hp_helpers) then
+    raise exception 'HP_TEST_ABGEBROCHEN: In hp_helpers stehen schon Zeilen. Diese Tests laufen nur bei leerer Helfertabelle, auch ohne Testhelfer. Im laufenden Betrieb stattdessen supabase/tests/check_rechte.sql ausführen.';
+  end if;
   -- ------------------------------------------------------------ Testdaten
   -- Helfer-Konten tragen Adresse und Marke wie von der Login-Funktion angelegt.
   -- Das Orga-Konto trägt hier absichtlich beides auch: Geschützt ist es allein

@@ -50,7 +50,7 @@ Darauf ist am Event also kein Verlass. Helfer machen deshalb vorher ein Bildschi
 |---|---|
 | „Dieser Link ist nicht gültig“ | Link wurde erneuert, gesperrt oder unvollständig kopiert. Neuen Link erzeugen und schicken. Der alte ist damit tot. |
 | „Zu viele Versuche“ | Kommt nur bei falschen oder alten Links, nach zehn Fehlversuchen in zehn Minuten vom selben Anschluss. Ein gültiger Link geht immer, auch im selben WLAN. Also: neuen Link erzeugen und schicken. |
-| Link wurde weitergegeben oder Telefon verloren | „Login-Link erneuern“. Alle Geräte mit dem alten Link sind sofort draußen. |
+| Link wurde weitergegeben oder Telefon verloren | „Login-Link erneuern“. Der alte Link ist sofort tot. Ein Gerät, auf dem die App noch offen ist, fliegt beim nächsten Abruf raus, spätestens nach 30 Sekunden. |
 | „Keine Verbindung“ | Netz prüfen, „Erneut versuchen“. Bleibt es rot: Ausdruck verwenden. |
 | „Keine Verbindung“ bei allen, obwohl das Netz geht | Das kostenlose Supabase-Projekt wurde pausiert, siehe unten. |
 
@@ -78,10 +78,14 @@ Gelöscht wird von Hand. Eine automatische Löschung gibt es nicht, weil vorher 
 
 ## Was gespeichert wird
 
-Pro Helfer: Anzeigename, Farbe, bevorzugter Kontaktweg ohne Nummer, Aufbau-Team ja oder nein, die zugewiesenen Schichten und Tauschvorgänge samt Notiz. Der Login-Link liegt nur als Prüfsumme in der Datenbank. Ein Protokoll hält fest, wann welche Aktion lief, ohne Namen. Die Daten liegen bei Supabase; die Region steht im Dashboard des Projekts.
+Pro Helfer: Anzeigename, Farbe, bevorzugter Kontaktweg ohne Nummer, Aufbau-Team ja oder nein, die zugewiesenen Schichten und Tauschvorgänge samt Notiz. Der Login-Link liegt nur als Prüfsumme in der Datenbank. Ein Protokoll hält fest, wann welche Aktion lief, ohne Namen. Die Daten liegen bei Supabase in Frankfurt (Region `eu-central-1`).
 
 Helfer finden eine Kurzfassung in der App unten unter „Datenschutz“. Der Text dort ist ein Entwurf aus der Technik. Ob er rechtlich genügt, prüft Norbert.
 
 ## Testlauf
 
-Vor dem Verteilen der Links läuft einmal der komplette Testlauf mit den drei Testhelfern (siehe README). Er schaltet die Tauschsperre um und entfernt am Ende die Testdaten. Deshalb bricht er sofort ab, sobald es einen Helfer gibt, der kein Testhelfer ist.
+Vor dem Verteilen der Links läuft einmal der Durchgang von Hand auf der veröffentlichten Seite mit den drei Testhelfern. Die Schritte stehen in `docs/TESTLAUF-5.0.0.md`. Er endet mit „Testdaten entfernen“ und ist die Freigabe.
+
+Den automatischen Browser-Testlauf gegen die Live-Seite (siehe README) startet nur die Orga selbst mit ihrem eigenen Passwort. Er braucht vorher wieder die drei Testhelfer (`supabase/tests/seed_test_helpers.sql`), schaltet die Tauschsperre um, ändert kurz Sperrzeitpunkt, Eventende und Löschtermin und bricht sofort ab, sobald es einen Helfer gibt, der kein Testhelfer ist.
+
+Hat eine andere Anwendung im selben Supabase-Projekt Rechte verändert: `supabase/migrations/0006_hp_grants.sql` noch einmal ausführen und mit `supabase/tests/check_rechte.sql` prüfen. Beides geht im laufenden Betrieb.

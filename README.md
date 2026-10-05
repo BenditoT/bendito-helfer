@@ -9,12 +9,12 @@ Version 5.0.0. Dieses Repository ist öffentlich und enthält **keine Personenda
 | Pfad | Inhalt |
 |---|---|
 | `index.html`, `app.js`, `styles.css` | Die App. Preact und htm ohne Build-Schritt. |
-| `config.js` | Adresse des Supabase-Projekts und der anon-Schlüssel. Wird nur über `tools/set-backend.mjs` geändert. |
+| `config.js` | Adresse des Supabase-Projekts und der öffentliche Schlüssel (publishable, früher anon). Wird nur über `tools/set-backend.mjs` geändert. |
 | `vendor/` | Preact, htm und supabase-js als feste Dateien mit Prüfsummen. Zur Laufzeit wird kein Code von Dritten geladen. |
 | `assets/` | Logo. |
 | `supabase/migrations/` | Datenbank: Tabellen `hp_…`, Funktionen, Schichtraster, Rechte. Interne Hilfsfunktionen liegen im Schema `hp_private`. |
 | `supabase/functions/hp-login/` | Edge Function, die den persönlichen Link gegen eine Sitzung tauscht. `supabase/config.toml` stellt sie ohne JWT-Prüfung bereit. |
-| `supabase/tests/` | SQL-Tests für Tausch (T1–T11) und Rechte (R1–R20), Testhelfer. |
+| `supabase/tests/` | SQL-Tests für Tausch (T1–T11) und Rechte (R1–R20), Rechteprüfung für den laufenden Betrieb (`check_rechte.sql`), Testhelfer. |
 | `tests/` | Statische Prüfungen, SQL-Testlauf, HTTP-Tests, Browser-Testlauf, Schranke vor der Veröffentlichung. |
 | `docs/` | [Betrieb](docs/BETRIEB.md), [Ankündigung](docs/ANKUENDIGUNG.md), [Review](docs/REVIEW-5.0.0.md), [Testprotokoll](docs/TESTLAUF-5.0.0.md). |
 
@@ -32,7 +32,9 @@ HP_PGDATABASE=hp_e2e node tests/local/stub-server.mjs &
 node tests/e2e/testlauf.cjs                # drei Browserprofile; braucht Playwright und Deno
 ```
 
-Die SQL-Dateien unter `supabase/tests/` laufen auch im echten Projekt: Jede rollt sich selbst zurück und meldet ihr Ergebnis in der Fehlermeldung nach `HP_TEST_RESULTS`.
+Die Testdateien `t_rights.sql` und `t_swaps.sql` laufen auch im echten Projekt, solange dort noch keine Helfer stehen: Jede rollt sich selbst zurück und meldet ihr Ergebnis in der Fehlermeldung nach `HP_TEST_RESULTS`. Die Fälle zählen Zeilen. Stehen schon Helfer in der Datenbank (auch Testhelfer), brechen beide sofort mit `HP_TEST_ABGEBROCHEN` ab und ändern nichts.
+
+Im laufenden Betrieb prüft `supabase/tests/check_rechte.sql` Rechte und Zeilensicherheit. Die Datei liest nur den Katalog, ändert nichts und läuft mit echten Daten. Erwartet: acht Zeilen, in jeder `ok = true`.
 
 Der Browser-Testlauf läuft gegen jede Adresse, auch gegen die Live-Seite:
 
@@ -40,7 +42,7 @@ Der Browser-Testlauf läuft gegen jede Adresse, auch gegen die Live-Seite:
 HP_BASE_URL=https://benditot.github.io/bendito-helfer/ HP_ADMIN_EMAIL=… HP_ADMIN_PASSWORD=… node tests/e2e/testlauf.cjs
 ```
 
-Der Testlauf schaltet die Tauschsperre um, ändert kurz den Sperrzeitpunkt und entfernt am Ende die Testdaten. Er bricht vor der ersten Änderung ab, wenn es einen Helfer gibt, der kein Testhelfer ist. Er gehört also vor das Verteilen der Links.
+Der Testlauf schaltet die Tauschsperre um, ändert kurz Sperrzeitpunkt, Eventende und Löschtermin, legt zwei weitere Testhelfer an und entfernt am Ende die Testdaten. Gegen die Live-Seite startet ihn nur die Orga selbst mit ihrem eigenen Passwort. Er bricht vor der ersten Änderung ab, wenn es einen Helfer gibt, der kein Testhelfer ist. Er gehört also vor das Verteilen der Links.
 
 Rot gewordene Tests werden nicht durch längere Wartezeiten grün gemacht. Die 30 Sekunden im Testlauf sind die Anforderung.
 
@@ -50,7 +52,7 @@ Rot gewordene Tests werden nicht durch längere Wartezeiten grün gemacht. Die 3
 2. Edge Function `hp-login` bereitstellen, **ohne JWT-Prüfung** (`verify_jwt = false`, steht in `supabase/config.toml`). Die Funktion ist der Login selbst und prüft den Code. Mit eingeschalteter Prüfung weist das Gateway Aufrufe mit einem publishable-Schlüssel ab, bevor die Funktion läuft.
 3. Orga-Konten in Supabase Auth anlegen und in `hp_admins` eintragen.
 4. `node tools/set-backend.mjs https://<projekt>.supabase.co <anon-Schlüssel>` trägt das Projekt in `config.js` und in die Content-Security-Policy ein.
-5. Prüfen: `supabase/tests/t_rights.sql` und `t_swaps.sql` im SQL-Editor laufen lassen, den Security Advisor ansehen, dann den Browser-Testlauf.
+5. Prüfen: `supabase/tests/t_rights.sql` und `t_swaps.sql` im SQL-Editor laufen lassen (vor dem Anlegen der ersten Helfer), den Security Advisor ansehen, die Selbstregistrierung im Projekt ausschalten, dann der Durchgang von Hand auf der veröffentlichten Seite (`docs/TESTLAUF-5.0.0.md`). Er ist die Freigabe.
 
 Hinweise zum Dashboard, falls ohne Supabase-CLI eingerichtet wird:
 
@@ -66,7 +68,7 @@ Läuft die App unter einer anderen Adresse als `https://benditot.github.io`, die
 Die App kommt mit einem geteilten Supabase-Projekt zurecht, ein eigenes ist aber die sauberere Lösung. Was beim Teilen gilt:
 
 - Alle Objekte heißen `hp_…` oder liegen im Schema `hp_private`. Die Migrationen fassen nichts anderes an.
-- Entzieht oder vergibt die andere App Funktionsrechte pauschal, danach `0006_hp_grants.sql` noch einmal ausführen. Die Datei darf beliebig oft laufen.
+- Entzieht oder vergibt die andere App Funktionsrechte pauschal, danach `0006_hp_grants.sql` noch einmal ausführen und mit `supabase/tests/check_rechte.sql` prüfen. Beide Dateien dürfen beliebig oft laufen.
 - Die internen Funktionen bleiben auch bei einer pauschalen Freigabe unerreichbar (eigenes Schema), die Login-Funktionen lassen weiterhin nur die Edge Function durch (Test R18).
 - Jeder Helfer-Link erzeugt ein Anmeldekonto im Projekt. Für die andere App ist so ein Konto „angemeldet“. Deren Rechte dürfen deshalb nicht an „ist angemeldet“ hängen. Das vor dem Zusammenlegen mit einem Helfer-Konto gegen die Tabellen und Funktionen der anderen App prüfen.
 

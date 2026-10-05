@@ -4,6 +4,9 @@
 -- bricht der Block mit dem Ergebnis ab und rollt damit auch die Testdaten
 -- zurück. Das Ergebnis steht in der Fehlermeldung nach „HP_TEST_RESULTS“.
 -- Nutzerwechsel über die JWT-Angaben der Sitzung (request.jwt.claims).
+--
+-- Nur bei leerer Helfertabelle: Sonst bricht der Block sofort ab, ohne etwas zu
+-- ändern. Für eine Prüfung im laufenden Betrieb gibt es check_rechte.sql.
 
 do $$
 declare
@@ -24,6 +27,11 @@ declare
   v_before text;
   v_after text;
 begin
+  -- Die Fälle zählen Zeilen. Stehen schon Helfer in der Datenbank, würden mehrere
+  -- Fälle rot, obwohl alles stimmt. Dann lieber gar nicht laufen.
+  if exists (select 1 from public.hp_helpers) then
+    raise exception 'HP_TEST_ABGEBROCHEN: In hp_helpers stehen schon Zeilen. Diese Tests laufen nur bei leerer Helfertabelle, auch ohne Testhelfer. Im laufenden Betrieb stattdessen supabase/tests/check_rechte.sql ausführen.';
+  end if;
   -- ------------------------------------------------------------ Testdaten
   insert into auth.users (id, email, raw_app_meta_data, created_at) values
     (u_admin, 'hp-test-admin-' || u_admin || '@helfer.bendito.invalid', '{"hp": "helper"}', now()),

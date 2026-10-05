@@ -4,8 +4,8 @@ Stand 05.10.2026. Das Review selbst (beide Durchgänge) lief am 04.10.2026 am St
 
 ## Ergebnis
 
-- Zwei Durchgänge durch je einen unabhängigen Prüfer, der den Code nicht geschrieben hat: erst das Review (15 Befunde), dann eine Nachprüfung der Korrekturen (12 Befunde).
-- Kein kritischer Befund in beiden Durchgängen. Zwei hohe Befunde im ersten Durchgang (R-01, R-02), beide behoben; die Nachprüfung fand keinen hohen mehr.
+- Drei Durchgänge durch je einen unabhängigen Prüfer, der den Code nicht geschrieben hat: erst das Review (15 Befunde), dann eine Nachprüfung der Korrekturen (12 Befunde), nach der Einrichtung eine Prüfung der Nachträge (14 Befunde).
+- Kein kritischer Befund in allen drei Durchgängen. Zwei hohe Befunde im ersten Durchgang (R-01, R-02), beide behoben; die Nachprüfung fand keinen hohen mehr. Der dritte Durchgang fand zwei hohe in Testprotokoll und Tests (P-01, P-02), beide behoben.
 - Alle mittleren Befunde sind behoben. Was bewusst offen bleibt, steht unten mit Begründung.
 
 ## Die Befunde, die diese Fassung schließen sollte
@@ -20,13 +20,13 @@ Quelle: `reviews/SECURITY-CODE-REVIEW.md` (S1–S10) und `reviews/DOMAIN-UX-REVI
 | S4 | Öffentlich lesbare Tabelle als Datenquelle | geschlossen | Abruf ersatzlos entfernt. Statischer Test gegen fremde Adressen. |
 | S5 | Abgleich ohne feste Kennungen und ohne Vorschau | geschlossen | Entfällt mit S4. Helfer legt die Orga in der App an. |
 | S6 | Namen und Planstand unbefristet im Browser und im Export | geschlossen, mit Rest | Im Browser bleiben nur Anmeldung und zwei Anzeige-Vorlieben. Löschtermin 15.11.2026 mit Erinnerung in der App. Rest: siehe „Bewusst offen“ 1 und 2. |
-| S7 | Kein Repository, kein Weg zurück | geschlossen im Repository | Git-Historie, Schranke vor der Veröffentlichung, `git revert` im README. Ob veröffentlicht ist, steht in der Übergabe (`HANDOVER.md`), nicht hier. |
+| S7 | Kein Repository, kein Weg zurück | geschlossen | Git-Historie, Schranke vor der Veröffentlichung, `git revert` im README. Veröffentlicht seit dem 04.10.2026. |
 | S8 | Fremdcode zur Laufzeit ohne Schutz | geschlossen | Bibliotheken liegen im Repository mit Prüfsummen. Content-Security-Policy erlaubt nur eigene Dateien und das eigene Supabase-Projekt. |
 | S9 | Fehler blieben stumm | geschlossen | Statuszeile mit Uhrzeit, roter Hinweis ohne Netz, Fehlermeldungen bleiben stehen, bis sie geschlossen werden. Testlauf 6b, 6b2. |
 | S10 | `dangerouslySetInnerHTML` | geschlossen | Nur zwei Stellen mit festen Texten aus dem Quelltext. Statischer Test. |
 | D1 | Oberfläche versprach Zusammenarbeit ohne gemeinsamen Stand | geschlossen | Wie S2. |
 | D2 | Tausch verletzte die fachliche Regel | geschlossen | Wie S3. |
-| D3 | Kein einsatzfähiger veröffentlichter Stand | offen bis zum Durchgang mit Anmeldung | Seite und Datenbank stehen seit dem 05.10.2026, die Datenbanktests sind dort grün. Einsatzfähig ist die App erst, wenn der Durchgang mit Anmeldung auf der veröffentlichten Seite grün ist (Prüfliste 2 und 12). Stand in der Übergabe. |
+| D3 | Kein einsatzfähiger veröffentlichter Stand | offen bis zum Durchgang mit Anmeldung | Seite und Datenbank stehen seit dem 05.10.2026, die Datenbanktests sind dort grün. Einsatzfähig ist die App erst, wenn die Selbstregistrierung im Projekt ausgeschaltet ist (Prüfliste 5) und danach der Durchgang mit Anmeldung auf der veröffentlichten Seite grün ist (Prüfliste 2, 7, 8 und 12). Stand in der Übergabe. |
 | D4 | Aktualität für Helfer nicht erkennbar | geschlossen | „Stand hh:mm:ss“ dauerhaft sichtbar. Ohne Netz rot mit Uhrzeit des letzten Stands. |
 | D5 | Kein Weg zur Wiederherstellung und Übergabe | geschlossen, mit Rest | Betriebsanleitung, Übergabe, Sicherung als Datei, Druckansicht. Rest: siehe „Bewusst offen“ 3. |
 | D6 | Bedienung unter Stress und Barrierearmut | geschlossen, mit Rest | Tastaturbedienung, Fokusführung, Tippziele ab 44 px, Telefonbreite 390 px. Testlauf 6c, 6d, 1e. Rest: siehe „Bewusst offen“ 6. |
@@ -72,9 +72,25 @@ Der Prüfer hat versucht, die neuen Teile zu brechen. Kein Durchbruch: Nach eine
 
 Dazu aus der Nachprüfung übernommen: Die Löschfunktionen treffen nur Konten, die die Login-Funktion selbst angelegt hat (Adresse **und** Marke in den App-Metadaten). Ein Konto einer anderen App mit ähnlicher Adresse bleibt (Tests R10, R14, R20).
 
+## Dritter Durchgang: Nachträge nach der Einrichtung
+
+Am 05.10.2026 hat ein weiterer Prüfer die nachgezogenen Dokumente gegen Code und Tests gehalten und die SQL-Tests in einer eigenen Datenbank nachgemessen.
+
+| Nr. | Stufe | Befund | Behandlung |
+|---|---|---|---|
+| P-01 | hoch | Der Durchgang von Hand öffnete nie einen gültigen Link ein zweites Mal. Genau das ist der Alltag (Link im Messenger wieder antippen) und im echten Anmeldedienst noch nie gelaufen. | Eigener Schritt 4 im Durchgang: derselbe Link noch einmal und auf einem zweiten Gerät. |
+| P-02 | hoch | „Die SQL-Tests laufen auch im echten Projekt“ stimmte nur bei leerer Helfertabelle. Mit Helfern in der Datenbank wurden fünf Rechte-Fälle rot, obwohl alles stimmte, weil sie Zeilen zählen. | Beide Testskripte brechen jetzt sofort ab, wenn schon Helfer in der Datenbank stehen, und ändern dann nichts. Für den laufenden Betrieb gibt es `supabase/tests/check_rechte.sql`: liest nur, läuft mit echten Daten. Beides ist getestet. |
+| P-03 | mittel | Der Durchgang prüfte nicht, ob beim Erneuern eines Links und beim Entfernen der Testdaten die Anmeldekonten wirklich verschwinden. Ein Fehlschlag steht nur im Protokoll. | Kontrolle im Dashboard in Schritt 7 und 9 des Durchgangs. |
+| P-04 | mittel | Unklar, welcher Lauf die Freigabe ist: Durchgang von Hand oder automatischer Browser-Testlauf. | Freigabe ist der Durchgang von Hand. Betrieb, README und Prüfliste sagen das jetzt gleich. |
+| P-05 | mittel | Die Freigabebedingung ließ die Selbstregistrierung aus. Der Durchgang soll mit der endgültigen Einstellung laufen. | Reihenfolge festgelegt: erst ausschalten, dann der Durchgang (D3, Prüfliste 5). |
+| P-06 | mittel | Die Begründung der 18 Warnungen war an drei Stellen ungenau (`hp_my_context()` lehnt nicht ab, sondern gibt die Rolle „none“ zurück). | Absatz unten neu gefasst. |
+| P-07 bis P-14 | niedrig | Ungenaue Beschriftungen im Durchgang, erlaubte Herkünfte verkürzt beschrieben, „Tabellen sind leer“, veraltete Verweise, Region, „sofort draußen“. | In Testprotokoll, Betrieb und README berichtigt. |
+
+Nicht übernommen: `hp_my_context()` die Freigabe für angemeldete Konten zu entziehen. Die Funktion gibt einem Konto ohne Zuordnung nur Rolle, Serverzeit und den Zähler des Datenstands zurück. Der Entzug wäre eine Änderung an der eingespielten Datenbank ohne Gewinn an Schutz.
+
 ### Haben die Tests Biss?
 
-Zu jedem neuen Schutz wurde in einer Kopie ein Fehler eingebaut und geprüft, ob ein Test rot wird. Stand nach dem Nachschärfen: 27 von 27 eingebauten Fehlern in der Datenbank werden erkannt (Fälle R2, R7, R8, R9, R10, R14, R17, R18, R19, R20, T11). Ein Fall braucht dafür Superuser-Rechte und läuft deshalb nur lokal (Sitzung ohne Rollenwechsel in R18). Zwei Fehler in der Login-Funktion bleiben ohne Test, siehe „Bewusst offen“ 7.
+Zu jedem neuen Schutz wurde in einer Kopie ein Fehler eingebaut und geprüft, ob ein Test rot wird. Stand nach dem Nachschärfen: 27 von 27 eingebauten Fehlern in der Datenbank werden erkannt (Fälle R2, R7, R8, R9, R10, R14, R17, R18, R19, R20, T11). Ein Fall braucht dafür Superuser-Rechte und läuft deshalb nur lokal (Sitzung ohne Rollenwechsel in R18). Zwei Fehler in der Login-Funktion bleiben ohne Test, siehe „Bewusst offen“ 7. Die Rechteprüfung `check_rechte.sql` hat eigene Gegenproben: Zwölf eingebaute Abweichungen (fehlende Zeilensicherheit, offene Regel, Tabellenrecht, zu viel oder zu wenig freigegebene Funktion, Zugriff auf `hp_private`, fehlender Suchpfad, pauschale Freigabe und pauschaler Entzug) werden alle gemeldet.
 
 ## Bewusst offen
 
@@ -91,25 +107,25 @@ Zu jedem neuen Schutz wurde in einer Kopie ein Fehler eingebaut und geprüft, ob
 
 ## Prüfliste im echten Projekt
 
-Stand 05.10.2026, Projekt in Frankfurt (`eu-central-1`), Postgres 17. Die Migrationen wurden unverändert aus dem veröffentlichten Repository geladen (Prüfsumme je Datei gleich dem lokalen Stand). Ein Abgleich von Tabellen, Spalten, Indizes, Regeln, Funktionen und Rechten ergab denselben Fingerabdruck wie in der lokalen Testdatenbank: 9 Tabellen mit eingeschalteter Zeilensicherheit, 20 Funktionen im Schema `public`, 17 in `hp_private`, davon ohne Anmeldung aufrufbar 0, angemeldet 18, nur für die Edge Function 2.
+Stand 05.10.2026, Projekt in Frankfurt (`eu-central-1`), Postgres 17. Die Migrationen wurden unverändert aus dem veröffentlichten Repository geladen (Prüfsumme je Datei gleich dem lokalen Stand). Ein Abgleich von Tabellen, Spalten, Indizes, Regeln, Funktionen und Rechten ergab denselben Fingerabdruck wie in der lokalen Testdatenbank: 9 Tabellen mit eingeschalteter Zeilensicherheit, 20 Funktionen im Schema `public`, 17 in `hp_private`, davon ohne Anmeldung aufrufbar 0, angemeldet 18, nur für die Edge Function 2. Die Rechteprüfung `check_rechte.sql` ist dort ebenfalls gelaufen: acht von acht Zeilen in Ordnung.
 
 | Nr. | Prüfung | Stand | Ergebnis |
 |---|---|---|---|
-| 1 | Login-Funktion erreichbar mit dem Schlüssel aus `config.js`, von der Pages-Adresse aus | erledigt | Falscher Link auf der veröffentlichten Seite zeigt „Dieser Link ist nicht gültig“. Vorabfrage des Browsers erlaubt nur die Pages-Adresse, eine fremde Herkunft wird nicht zurückgespiegelt. |
-| 2 | Ganze Kette mit einem Testhelfer, auch auf einem zweiten Gerät | **offen** | Braucht ein Orga-Konto. |
-| 3 | `t_rights.sql` und `t_swaps.sql` im SQL-Editor | erledigt | Rechte 20 von 20, Tausch 14 von 14, keine Datenreste. |
+| 1 | Login-Funktion erreichbar mit dem Schlüssel aus `config.js`, von der Pages-Adresse aus | erledigt | Falscher Link auf der veröffentlichten Seite zeigt „Dieser Link ist nicht gültig“. Die Vorabfrage des Browsers erlaubt die Pages-Adresse (dazu Einträge aus `HP_ALLOWED_ORIGINS` und für lokale Tests `http://localhost` und `http://127.0.0.1`); eine fremde Herkunft wird nicht zurückgespiegelt. |
+| 2 | Ganze Kette mit einem Testhelfer, auch auf einem zweiten Gerät | **offen** | Braucht ein Orga-Konto. Schritte 3 und 4 im Durchgang. |
+| 3 | `t_rights.sql` und `t_swaps.sql` im SQL-Editor | erledigt | Rechte 20 von 20, Tausch 14 von 14, keine Datenreste. Gelaufen bei leerer Helfertabelle, vor dem Anlegen der drei Testhelfer. |
 | 4 | Security Advisor ohne Fehler | erledigt | 0 Fehler, 18 Warnungen, siehe unten. |
-| 5 | Ohne Anmeldung kein Zugriff; selbst registriertes Konto kein Zugriff | teils | Ohne Anmeldung: Tabellen und Funktionen lehnen ab, `hp_private` wird von der Daten-API nicht angeboten. Ein angemeldetes Konto ohne Zuordnung prüft Fall R6 in der Datenbank. **Offen:** Selbstregistrierung im Projekt ist noch eingeschaltet. |
-| 6 | Gemeinsames Projekt: Helfer-Token gegen die zweite App | **offen** | Die zweite App ist noch nicht eingespielt. |
-| 7 | Link erneuern: altes Anmeldekonto weg, kein `auth_cleanup FAILED` | **offen** | Braucht ein Orga-Konto. In der Datenbank grün (R20). |
-| 8 | Sperrzeitpunkt leeren und wieder setzen | **offen** | Über die echte Daten-API noch nicht gelaufen. In der Datenbank grün (R19). |
+| 5 | Ohne Anmeldung kein Zugriff; selbst registriertes Konto kein Zugriff | teils | Ohne Anmeldung: Tabellen und Funktionen lehnen ab, `hp_private` wird von der Daten-API nicht angeboten. Ein angemeldetes Konto ohne Zuordnung prüft Fall R6 in der Datenbank. **Offen:** Selbstregistrierung im Projekt ist noch eingeschaltet. Sie wird vor dem Durchgang ausgeschaltet. |
+| 6 | Gemeinsames Projekt: Helfer-Token gegen die zweite App | **offen** | Die zweite App ist noch nicht eingespielt. Danach `0006_hp_grants.sql` erneut ausführen und mit `check_rechte.sql` prüfen. |
+| 7 | Link erneuern: altes Anmeldekonto weg, kein `auth_cleanup FAILED` | **offen** | Braucht ein Orga-Konto. In der Datenbank grün (R8, R20). Schritte 7 und 9 im Durchgang. |
+| 8 | Sperrzeitpunkt leeren und wieder setzen | **offen** | Über die echte Daten-API noch nicht gelaufen. In der Datenbank grün (R19). Schritt 8 im Durchgang. |
 | 9 | Sitzung länger als eine Stunde | **offen** |  |
 | 10 | Welche Absenderadresse die Login-Funktion sieht | erledigt | Die Adresse kommt vom Gateway. Selbst gesetzte Kopfzeilen (`CF-Connecting-IP`, `X-Forwarded-For`, `X-Real-IP`) umgehen die Begrenzung nicht. Der elfte Fehlversuch in zehn Minuten bekommt 429. |
 | 11 | Region und Verhalten bei pausiertem Projekt | teils | Region Frankfurt. Das Pausieren wurde nicht ausprobiert. |
-| 12 | Browser-Testlauf gegen die veröffentlichte Seite | **offen** | Seite liefert Version 5.0.0 ohne Skriptfehler aus. Der Durchgang mit Anmeldung fehlt. |
+| 12 | Durchgang mit Anmeldung auf der veröffentlichten Seite (von Hand, Schritte im Testprotokoll) | **offen** | Seite liefert Version 5.0.0 ohne Skriptfehler aus. Der Durchgang fehlt. |
 
 ### Die 18 Warnungen des Security Advisors
 
-Alle 18 lauten gleich: Eine Funktion mit den Rechten ihres Besitzers ist für angemeldete Konten aufrufbar. Das betrifft genau die 18 Funktionen, über die die App arbeitet, und ist die gewählte Bauweise: Die Tabellen sind für Clients vollständig gesperrt, jeder Zugriff läuft über diese Funktionen, und jede prüft beim Aufruf selbst, wer aufruft (Orga, Helfer oder niemand). Die Fälle R1 bis R20 testen das, auch für ein angemeldetes Konto, das weder Orga noch Helfer ist. Die Warnungen bleiben deshalb stehen. Fehler meldet der Advisor keine.
+Alle 18 lauten gleich: Eine Funktion mit den Rechten ihres Besitzers ist für angemeldete Konten aufrufbar. Das betrifft genau die 18 Funktionen, die `0006_hp_grants.sql` für angemeldete Konten freigibt (17 ruft die App direkt auf, `hp_my_context()` nur über `hp_state()`), und ist die gewählte Bauweise: Die Tabellen sind für Clients vollständig gesperrt, jeder Zugriff läuft über diese Funktionen. 17 davon prüfen als Erstes, ob Orga oder ein zugeordneter Helfer aufruft, und lehnen sonst mit `NOT_ALLOWED` ab. `hp_my_context()` lehnt nicht ab: Ein angemeldetes Konto ohne Zuordnung bekommt die Rolle „none“, die Serverzeit und den Zähler des Datenstands, aber keine Namen und keinen Plan. Fall R6 prüft das Konto ohne Zuordnung an den Lese- und Tauschfunktionen und an einer Orga-Funktion; die übrigen Orga-Funktionen prüft R4 mit einem Helfer-Konto über dieselbe Prüfung (`hp_private.require_admin()`). Die Warnungen bleiben deshalb stehen. Fehler meldet der Advisor keine.
 
-Der Performance Advisor meldet 0 Fehler, 0 Warnungen und zwei Hinweise auf noch ungenutzte Indizes. Die Tabellen sind leer, die Hinweise sagen deshalb nichts aus.
+Der Performance Advisor meldet 0 Fehler, 0 Warnungen und zwei Hinweise auf noch ungenutzte Indizes. Zuweisungen, Tausch und Hinweise sind noch leer, die Hinweise sagen deshalb nichts aus.

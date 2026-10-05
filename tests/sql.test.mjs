@@ -100,3 +100,56 @@ test('T3c gleichzeitige Annahme in zwei Sitzungen', { skip }, async () => {
     `);
   }
 });
+
+// Die Testskripte zählen Zeilen. Stehen schon Helfer in der Datenbank, brechen
+// sie ab, bevor sie etwas anlegen, statt mit falschem Alarm rot zu werden.
+test('Testskripte brechen ab, wenn schon Helfer in der Datenbank stehen', { skip }, () => {
+  for (const file of ['supabase/tests/t_rights.sql', 'supabase/tests/t_swaps.sql']) {
+    const out = psql(['-At'], `
+      begin;
+      insert into public.hp_helpers (display_name, is_test) values ('Test Schon Da', true);
+      \\i ${file}
+      rollback;
+    `);
+    const text = out.stderr + out.stdout;
+    assert.match(text, /HP_TEST_ABGEBROCHEN/, file + ': ' + text.slice(0, 400));
+    assert.doesNotMatch(text, /HP_TEST_RESULTS/, file);
+  }
+  const left = psql(['-Atc', "select (select count(*) from public.hp_helpers) || '|' || (select count(*) from auth.users) || '|' || (select count(*) from public.hp_shifts where id like 'z%')"]);
+  assert.equal(left.stdout.trim(), '0|0|0');
+});
+
+// Die Rechteprüfung für den laufenden Betrieb: liest nur den Katalog.
+test('check_rechte.sql: frisch alles in Ordnung, jede Abweichung wird gemeldet', { skip }, () => {
+  const run = (prepare) => {
+    const out = psql(['-At', '-F', '\t'], `
+      begin;
+      ${prepare}
+      \\i supabase/tests/check_rechte.sql
+      rollback;
+    `);
+    assert.equal(out.status, 0, out.stderr);
+    const rows = out.stdout.split('\n').filter((l) => /^\d\t/.test(l)).map((l) => l.split('\t'));
+    assert.equal(rows.length, 8, out.stdout);
+    return Object.fromEntries(rows.map((r) => [r[0], r[4] === 't']));
+  };
+  const allOk = run('');
+  assert.deepEqual(Object.values(allOk), Array(8).fill(true), JSON.stringify(allOk));
+  const bad = (prepare) => Object.entries(run(prepare)).filter(([, ok]) => !ok).map(([nr]) => nr).join(',');
+  assert.equal(bad('alter table public.hp_audit disable row level security;'), '1');
+  assert.equal(bad('drop policy hp_no_client on public.hp_swaps; create policy offen on public.hp_swaps for select to authenticated using (true);'), '2');
+  assert.equal(bad('grant select on public.hp_helpers to authenticated;'), '3');
+  assert.equal(bad('grant execute on function public.hp_state() to anon;'), '4');
+  assert.equal(bad('revoke execute on function public.hp_state() from authenticated;'), '5');
+  assert.equal(bad('grant execute on function public.hp_login_bind(uuid, text, uuid) to authenticated;'), '5');
+  assert.equal(bad('grant execute on function hp_private.touch() to service_role;'), '6');
+  assert.equal(bad('revoke execute on function public.hp_login_lookup(text, text) from service_role;'), '6');
+  assert.equal(bad('grant usage on schema hp_private to anon;'), '7');
+  assert.equal(bad('alter function public.hp_state() reset search_path;'), '8');
+  // Das, was eine andere Anwendung im selben Projekt pauschal anrichten könnte.
+  assert.equal(bad('grant execute on all functions in schema public to anon, authenticated;'), '4,5');
+  assert.equal(bad('revoke execute on all functions in schema public from anon, authenticated, service_role;'), '5,6');
+  // Die Prüfung selbst ändert nichts.
+  const after = run('');
+  assert.deepEqual(after, allOk);
+});

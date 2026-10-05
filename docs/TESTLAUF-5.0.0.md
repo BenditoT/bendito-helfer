@@ -1,10 +1,10 @@
 # Testprotokoll Helferplan 5.0.0
 
-Läufe vom 04.10.2026 (lokal) und aus der Nacht zum 05.10.2026 (echtes Projekt). Alle Namen in diesem Protokoll und auf den Bildern sind erfundene Testhelfer.
+Läufe vom 04. und 05.10.2026 (lokal) und aus der Nacht zum 05.10.2026 (echtes Projekt). Alle Namen in diesem Protokoll und auf den Bildern sind erfundene Testhelfer.
 
 ## Wogegen getestet wurde
 
-**Lokal, gegen einen Nachbau von Supabase:** Postgres 16 mit denselben Rollen und Standardrechten wie ein Supabase-Projekt, die echte Login-Funktion `hp-login` unter Deno, die App unverändert mit derselben Content-Security-Policy.
+**Lokal, gegen einen Nachbau von Supabase:** Postgres 16 mit denselben Rollen und Standardrechten wie ein Supabase-Projekt, die echte Login-Funktion `hp-login` unter Deno, die App-Dateien unverändert; nur `config.js` und das Verbindungsziel der Content-Security-Policy zeigen auf den Nachbau.
 
 **Im echten Supabase-Projekt und auf der veröffentlichten Seite** (Nacht zum 05.10.2026): die Datenbanktests im SQL-Editor, die Login-Funktion über HTTP und der Aufruf der Seite. Ergebnis im Abschnitt „Echtes Projekt“.
 
@@ -15,7 +15,7 @@ Läufe vom 04.10.2026 (lokal) und aus der Nacht zum 05.10.2026 (echtes Projekt).
 | Gruppe | Aufruf | Ergebnis |
 |---|---|---|
 | Statische Prüfungen | `node --test tests/static.test.mjs` | 16 von 16 |
-| Datenbank: Tausch T1–T11, Rechte R1–R20, gleichzeitige Annahme, keine Datenreste | `node --test tests/sql.test.mjs` | 38 von 38 |
+| Datenbank: Tausch T1–T11, Rechte R1–R20, gleichzeitige Annahme, keine Datenreste, Abbruch bei vorhandenen Helfern, Rechteprüfung mit Gegenproben | `node --test tests/sql.test.mjs` | 40 von 40 |
 | HTTP: Login-Funktion, Fehlversuche, Herkünfte, abgelaufene Token, leerer Wert | `node --test tests/http.test.mjs` | 6 von 6 |
 | Browser-Testlauf mit drei Profilen | `node tests/e2e/testlauf.cjs` | 27 von 27 |
 | Gegenproben: absichtlich eingebaute Fehler in der Datenbank | siehe Review | 27 von 27 erkannt |
@@ -78,32 +78,38 @@ Projekt in Frankfurt, Postgres 17. Eingespielt wurden die Migrationen `0001` bis
 | Prüfung | Ergebnis |
 |---|---|
 | Abgleich mit der lokalen Testdatenbank (Tabellen, Spalten, Indizes, Regeln, Funktionen, Rechte, Schichtraster) | gleich |
-| `supabase/tests/t_swaps.sql` im SQL-Editor | 14 von 14 |
-| `supabase/tests/t_rights.sql` im SQL-Editor | 20 von 20 |
+| `supabase/tests/t_swaps.sql` im SQL-Editor, bei leerer Helfertabelle | 14 von 14 |
+| `supabase/tests/t_rights.sql` im SQL-Editor, bei leerer Helfertabelle | 20 von 20 |
 | Datenreste nach den Tests | keine |
+| `supabase/tests/check_rechte.sql` im SQL-Editor, mit den drei Testhelfern in der Datenbank | 8 von 8 Zeilen in Ordnung |
 | Login-Funktion: falscher Code, kaputter Rumpf | 401 `invalid` |
 | Login-Funktion: falsche Methode | 405 |
-| Login-Funktion: Vorabfrage von der Pages-Adresse und von einer fremden Herkunft | nur die Pages-Adresse wird erlaubt |
+| Login-Funktion: Vorabfrage von der Pages-Adresse und von einer fremden Herkunft | Pages-Adresse erlaubt, fremde Herkunft nicht zurückgespiegelt |
 | Ohne Anmeldung: Funktionen und Tabellen | abgelehnt |
 | Schema `hp_private` über die Daten-API | nicht angeboten |
 | Elfter Fehlversuch in zehn Minuten, auch mit selbst gesetzter Absenderadresse | 429 |
 | Security Advisor | 0 Fehler, 18 Warnungen (begründet im Review) |
 | Veröffentlichte Seite | Version 5.0.0, keine Skriptfehler, falscher Link zeigt „Dieser Link ist nicht gültig“ |
 
-Die Zeilen aus den Fehlversuchen wurden danach gelöscht. In der Datenbank stehen die drei Testhelfer ohne Link und ohne Schichten.
+Die beiden Testskripte liefen im Stand des veröffentlichten Commits `4d3159b`. Seitdem ist nur der Abbruch bei vorhandenen Helfern dazugekommen, die Fälle sind dieselben. Die Zeilen aus den Fehlversuchen wurden danach gelöscht. In der Datenbank stehen die drei Testhelfer ohne Link und ohne Schichten, kein Orga-Konto und kein Anmeldekonto.
 
 ## Durchgang auf der veröffentlichten Seite
 
-Offen. Die Orga meldet sich selbst an; Passwörter gibt niemand weiter.
+**Offen.** Dieser Durchgang von Hand ist die Freigabe, bevor Links an Helfer gehen. Er dauert rund 15 Minuten und braucht einen Rechner, ein Telefon und den Blick ins Supabase-Dashboard.
 
-1. Auf der Seite über „Orga-Login“ anmelden. Im Fuß steht 5.0.0, die Liste zeigt Test Anna, Test Ben und Test Cleo.
-2. Anna und Ben je zwei Schichten zuweisen.
-3. Für Anna einen Login-Link erzeugen und auf dem eigenen Telefon öffnen. „Mein Plan“ zeigt ihre Schichten.
-4. Am Rechner Anna eine weitere Schicht zuweisen. Sie erscheint auf dem Telefon ohne Neuladen innerhalb von 30 Sekunden.
-5. Für Ben einen Link erzeugen und in einem privaten Fenster öffnen. Auf dem Telefon als Anna einen Tausch mit Bens Schicht anfragen, als Ben annehmen. Beide Pläne und das Board zeigen den Tausch.
-6. Annas Link erneuern. Das Telefon ist nach spätestens 30 Sekunden draußen, der alte Link zeigt „Dieser Link ist nicht gültig“.
-7. Unter „Einstellungen“ den Sperrzeitpunkt leeren und wieder auf Do 29.10.2026, 20:00 setzen.
-8. „Testdaten entfernen“. Der Plan ist leer.
+Vorher im Dashboard: Selbstregistrierung ausschalten (nur die Neuanmeldung, der Login mit E-Mail bleibt an), Orga-Konto bestätigt anlegen und in `hp_admins` eintragen. Die Orga meldet sich selbst an; Passwörter gibt niemand weiter.
+
+1. Über „Orga-Login“ anmelden. Im Fuß steht „Version 5.0.0“. Unter „Einstellungen“ zeigt „Alle Helfer (3)“ Test Anna, Test Ben und Test Cleo, jeweils mit „kein Login-Link“. Steht stattdessen „Dieses Konto hat keinen Zugriff auf den Helferplan.“, fehlt der Eintrag in `hp_admins`.
+2. Auf dem Board Test Anna antippen, dann „+“ bei Fr 17:30 Bar A und bei Sa 10:00 Bar A. Test Ben ebenso bei Fr 19:00 Bar A und Sa 11:30 Bar A.
+3. Unter „Einstellungen“ bei Test Anna „Login-Link erzeugen“, „Link kopieren“, ans eigene Telefon schicken und dort öffnen. „Mein Plan“ zeigt beide Schichten. Seite neu laden: Anna bleibt angemeldet. Den Link aufheben.
+4. Denselben Link auf dem Telefon noch einmal antippen und zusätzlich in einem privaten Fenster am Rechner öffnen. Beide Male ist Anna angemeldet und sieht denselben Plan.
+5. Als Orga Test Anna zusätzlich So 11:30 Bar A zuweisen. Das Telefon bleibt an, die Seite im Vordergrund: Die Schicht erscheint ohne Neuladen innerhalb von 30 Sekunden.
+6. Bei Test Ben „Login-Link erzeugen“ und den Link im privaten Fenster öffnen (Ben ersetzt dort Anna). Auf dem Telefon unter „Mein Plan“ bei Fr 17:30 Bar auf „Tausch“, bei „Dafür möchtest du“ die Schicht „19:00 Bar · mit Test Ben“ wählen, „Anfrage senden“. Bei Ben erscheint binnen 30 Sekunden eine Zahl am Reiter „Mein Tausch“; dort „Annehmen“, dann „Tauschen“. Beide Pläne und das Board zeigen den Tausch, auch nach Neuladen.
+7. Bei Test Anna „Login-Link erneuern“, dann „Neuen Link erzeugen“. Das Telefon zeigt nach spätestens 30 Sekunden „Dieser Zugang ist nicht mehr gültig.“, der alte Link zeigt „Dieser Link ist nicht gültig“, der neue meldet Anna wieder an. Im Dashboard unter „Authentication“ gibt es jetzt genau zwei Konten der Form `hp-…@helfer.bendito.invalid`.
+8. Unter „Einstellungen“ → „Schichttausch“ das Feld „Automatisch gesperrt ab“ leeren, „Speichern“: Meldung „Sperrzeitpunkt entfernt.“, nach Neuladen ist das Feld leer. Dann 29.10.2026, 20:00 eintragen, „Speichern“: „Sperrzeitpunkt gespeichert.“
+9. Unter „Testdaten und Löschung“ auf „Testdaten entfernen“; der Dialog nennt die drei Namen. Danach: „3 Testhelfer entfernt.“, oben „0/64 belegt“, Telefon und privates Fenster zeigen binnen 30 Sekunden die Anmeldeseite. Im Dashboard gibt es kein Konto `hp-…@helfer.bendito.invalid` mehr, und `select count(*) from public.hp_audit where action = 'auth_cleanup'` ergibt 0.
+
+Für einen zweiten Durchgang vorher `supabase/tests/seed_test_helpers.sql` im SQL-Editor ausführen.
 
 ## Was der Lauf nicht zeigt
 
@@ -111,3 +117,4 @@ Offen. Die Orga meldet sich selbst an; Passwörter gibt niemand weiter.
 - Das Neuladen ohne Netz bei Auslieferung über GitHub Pages.
 - Ein echtes Telefon. Getestet ist die Telefonbreite in einem Desktop-Browser mit Touch.
 - Einen Screenreader.
+- Die übrigen offenen Punkte im echten Projekt (zweite App, Sitzung über eine Stunde, pausiertes Projekt, gleichzeitiges Öffnen auf zwei Geräten). Sie stehen in der Prüfliste im Review.

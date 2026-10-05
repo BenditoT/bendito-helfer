@@ -37,3 +37,11 @@ Erste gemeinsam nutzbare Fassung. Der bisherige Stand lief nur in einem einzelne
 - Abruf der öffentlich lesbaren Tabelle. Helfer legt die Orga in der App an.
 - Freitext-Nachrichten. Es gibt nur noch Hinweise zu Tauschvorgängen; für alles andere zeigt die App den bevorzugten Kontaktweg.
 - Fachdaten im Browser-Speicher, Fremdschrift und Bibliotheken von fremden Servern.
+
+### Nach der Einrichtung ergänzt (05.10.2026)
+
+Die App selbst ist unverändert, die Version bleibt 5.0.0.
+
+- `supabase/tests/check_rechte.sql`: prüft Rechte und Zeilensicherheit, liest nur und läuft auch im laufenden Betrieb.
+- Die SQL-Tests brechen sofort ab, wenn schon Helfer in der Datenbank stehen, statt mit falschem Alarm rot zu werden.
+- Testprotokoll mit den Ergebnissen aus dem echten Projekt und dem Durchgang von Hand für die veröffentlichte Seite. Review mit Prüfliste und drittem Durchgang.

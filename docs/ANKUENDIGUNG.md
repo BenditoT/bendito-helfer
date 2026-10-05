@@ -9,6 +9,8 @@ Fertige Texte zum Verschicken. Vier Platzhalter ersetzen:
 
 Verschickt wird einzeln, zum Beispiel per WhatsApp. Die App selbst versendet nichts.
 
+**Erst verschicken, wenn** der Durchgang auf der veröffentlichten Seite grün ist (`docs/TESTLAUF-5.0.0.md`), die echten Helfer angelegt und die Schichten zugewiesen sind.
+
 ## Deutsch
 
 > Hallo {NAME},
