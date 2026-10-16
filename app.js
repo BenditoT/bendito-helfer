@@ -1,4 +1,4 @@
-/* Bendito Helferplan 5.0.0
+/* Bendito Helferplan 5.0.1
  *
  * Preact + htm ohne Build-Schritt. Alle Fachdaten liegen in der Datenbank und
  * kommen über hp_state(); geändert wird nur über die hp_-Funktionen. Im Browser

@@ -1,0 +1,20 @@
+db.benditotango.de {
+	encode gzip
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy no-referrer
+		-Server
+	}
+	@api path /auth/v1/* /rest/v1/* /functions/v1/*
+	handle @api {
+		reverse_proxy 127.0.0.1:8100 {
+			header_up -Cf-Connecting-Ip
+			header_up X-Real-Ip {remote_host}
+			header_up X-Forwarded-For {remote_host}
+		}
+	}
+	handle {
+		respond 404
+	}
+}

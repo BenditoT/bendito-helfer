@@ -89,7 +89,9 @@ test('config.js und CSP zeigen auf dasselbe Projekt; nur der anon-Schlüssel', (
     assert.equal(key, '');
     assert.equal(connect.trim(), "'none'");
   } else {
-    assert.match(url, /^https:\/\/[a-z0-9]{20}\.supabase\.co$/);
+    const hosted = /^https:\/\/[a-z0-9]{20}\.supabase\.co$/;
+    const ownHost = /^https:\/\/[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/;
+    assert.ok(hosted.test(url) || ownHost.test(url), 'Adresse ist kein erlaubter Hostname');
     assert.equal(connect.trim(), url);
     if (key.startsWith('eyJ')) {
       assert.equal(JSON.parse(Buffer.from(key.split('.')[1], 'base64url').toString('utf8')).role, 'anon');

@@ -3,10 +3,12 @@
 // von index.html ein. Beide müssen zusammenpassen, deshalb nur über dieses Skript.
 //
 //   node tools/set-backend.mjs https://<projekt>.supabase.co <anon-Schlüssel>
+//   node tools/set-backend.mjs https://<hostname> <anon-Schlüssel>
 //   node tools/set-backend.mjs --leer        (Verbindung wieder entfernen)
 //
-// Nimmt nur den anon- oder publishable-Schlüssel an. Ein Schlüssel mit
-// Dienstrechten wird abgelehnt, weil er nie in den Browser gehört.
+// Eine eigene Adresse ist https und ein Hostname ohne Pfad, zum Beispiel
+// https://db.benditotango.de. Nimmt nur den anon- oder publishable-Schlüssel an.
+// Ein Schlüssel mit Dienstrechten wird abgelehnt, weil er nie in den Browser gehört.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
@@ -18,8 +20,10 @@ let url = '', key = '';
 if (a !== '--leer') {
   url = String(a || '').replace(/\/+$/, '');
   key = String(b || '');
-  if (!/^https:\/\/[a-z0-9]{20}\.supabase\.co$/.test(url)) {
-    console.error('Adresse erwartet in der Form https://<20 Zeichen>.supabase.co');
+  const hosted = /^https:\/\/[a-z0-9]{20}\.supabase\.co$/;
+  const ownHost = /^https:\/\/[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/;
+  if (!hosted.test(url) && !ownHost.test(url)) {
+    console.error('Adresse erwartet als https://<20 Zeichen>.supabase.co oder https://<hostname> ohne Pfad.');
     process.exit(1);
   }
   let ok = /^sb_publishable_[A-Za-z0-9_-]+$/.test(key);

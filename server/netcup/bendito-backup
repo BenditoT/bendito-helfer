@@ -1,0 +1,41 @@
+#!/bin/bash
+# Sichert die Bendito-Datenbank. Gibt keine Inhalte aus.
+set -euo pipefail
+umask 077
+
+dir=/var/backups/bendito
+mkdir -p "$dir"
+chmod 700 "$dir"
+stamp=$(date +%Y%m%d-%H%M)
+out="$dir/bendito-${stamp}.dump"
+tmp=$(mktemp "$dir/.bendito.XXXXXX")
+chmod 600 "$tmp"
+
+cleanup() { rm -f -- "$tmp"; }
+trap cleanup EXIT
+
+docker exec bendito-db pg_dump -U postgres -d postgres -Fc > "$tmp"
+if ! cmp -s -n 5 "$tmp" <(printf 'PGDMP'); then
+  echo "backup: dump header missing" >&2
+  exit 1
+fi
+if [ ! -s "$tmp" ]; then
+  echo "backup: dump empty" >&2
+  exit 1
+fi
+
+trap - EXIT
+mv -f -- "$tmp" "$out"
+chmod 600 "$out"
+chown root:root "$out"
+
+mapfile -t old < <(find "$dir" -maxdepth 1 -type f -name 'bendito-*.dump' -printf '%T@ %p\n' | sort -nr | awk 'NR>28 { print $2 }')
+if [ "${#old[@]}" -gt 0 ]; then
+  rm -f -- "${old[@]}"
+fi
+
+mkdir -p /home/nk/bendito-backups
+chown nk:nk /home/nk/bendito-backups
+chmod 700 /home/nk/bendito-backups
+install -o nk -g nk -m 600 "$out" /home/nk/bendito-backups/latest.dump
+echo "backup ok ${stamp}"

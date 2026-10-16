@@ -1,0 +1,9 @@
+[Unit]
+Description=Bendito Datenbank-Backup alle 6 Stunden
+
+[Timer]
+OnCalendar=*-*-* 00/6:15
+Persistent=true
+
+[Install]
+WantedBy=timers.target

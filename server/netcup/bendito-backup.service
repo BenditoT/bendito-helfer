@@ -1,0 +1,6 @@
+[Unit]
+Description=Bendito Datenbank-Backup
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/bendito-backup

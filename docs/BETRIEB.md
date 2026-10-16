@@ -1,4 +1,4 @@
-# Betrieb: Bendito Helferplan 5.0.0
+# Betrieb: Bendito Helferplan 5.0.1
 
 Für die Orga. Bendito Tango Marathon, Fr 30.10. bis So 01.11.2026.
 
@@ -54,9 +54,21 @@ Darauf ist am Event also kein Verlass. Helfer machen deshalb vorher ein Bildschi
 | „Keine Verbindung“ | Netz prüfen, „Erneut versuchen“. Bleibt es rot: Ausdruck verwenden. |
 | „Keine Verbindung“ bei allen, obwohl das Netz geht | Das kostenlose Supabase-Projekt wurde pausiert, siehe unten. |
 
+## Datenbank auf netcup
+
+Die App spricht seit 5.0.1 die eigene Datenbank unter [db.benditotango.de](https://db.benditotango.de/auth/v1/health) an. Erreichbar sind nur Anmeldung, Daten-API und die Login-Funktion. Studio und die Datenbank selbst sind von außen nicht erreichbar.
+
+Auf dem Server laufen sieben Dienste im Compose-Projekt `bendito`: Datenbank, Anmeldung, Daten-API, Meta, Studio, Gateway und die Login-Funktion. Das Gateway hört nur auf `127.0.0.1:8100`. Caddy reicht die drei Pfade weiter. Realtime, Storage und der Pooler sind nicht gestartet.
+
+Sicherung: alle sechs Stunden ein Dump auf dem Server, Aufbewahrung 28 Dateien. Eine Kopie liegt unter `~/Backups/bendito-db/` auf Norberts Mac (täglich 08:00 und beim Anmelden, 30 Dateien). Die Wiederherstellungsprobe legt eine Wegwerf-Datenbank an, vergleicht die Zeilenzahlen von Schichten und Helfern und löscht sie wieder.
+
+Rückweg auf die Cloud, falls der eigene Server ausfällt: im Repo `node tools/set-backend.mjs https://pumbaojykazurlncntae.supabase.co sb_publishable_Rfc4THqxTClo3UMIk5c8Eg_FkDKpjh9`, Version hoch, Commit, Push. Vorher einen Dump ziehen. Was nur auf netcup steht, ist in der Cloud nicht vorhanden. Die Cloud nicht löschen und nicht pausieren. Bis zum 15.11. einmal pro Woche das [Dashboard](https://supabase.com/dashboard/project/pumbaojykazurlncntae) öffnen.
+
+Das Orga-Konto legt Norbert selbst an: `tools/orga-konto-netcup.sh` im Terminal. Das Skript fragt E-Mail und Passwort ab und gibt beides nicht aus.
+
 ## Damit die Datenbank nicht einschläft
 
-Ein kostenloses Supabase-Projekt wird nach etwa einer Woche ohne Zugriffe pausiert. Dann zeigt die App bei allen „Keine Verbindung“.
+Dieser Abschnitt gilt nur, wenn die App wieder auf dem kostenlosen Supabase-Projekt läuft. Ein kostenloses Supabase-Projekt wird nach etwa einer Woche ohne Zugriffe pausiert. Dann zeigt die App bei allen „Keine Verbindung“.
 
 - **Als Zugriff zählt nur eine Anmeldung oder ein geöffneter Plan.** Die Startseite allein aufzurufen genügt nicht, sie fragt die Datenbank nicht an.
 - In den Wochen vor dem Event meldet sich deshalb jemand aus der Orga **mindestens zweimal pro Woche** an. Sobald Helfer ihre Links nutzen, erledigt sich das von selbst.
@@ -78,7 +90,7 @@ Gelöscht wird von Hand. Eine automatische Löschung gibt es nicht, weil vorher 
 
 ## Was gespeichert wird
 
-Pro Helfer: Anzeigename, Farbe, bevorzugter Kontaktweg ohne Nummer, Aufbau-Team ja oder nein, die zugewiesenen Schichten und Tauschvorgänge samt Notiz. Der Login-Link liegt nur als Prüfsumme in der Datenbank. Ein Protokoll hält fest, wann welche Aktion lief, ohne Namen. Die Daten liegen bei Supabase in Frankfurt (Region `eu-central-1`).
+Pro Helfer: Anzeigename, Farbe, bevorzugter Kontaktweg ohne Nummer, Aufbau-Team ja oder nein, die zugewiesenen Schichten und Tauschvorgänge samt Notiz. Der Login-Link liegt nur als Prüfsumme in der Datenbank. Ein Protokoll hält fest, wann welche Aktion lief, ohne Namen. Die Daten liegen auf dem eigenen Server bei netcup in Nürnberg. Der Rückweg zur Supabase-Cloud in Frankfurt steht im Abschnitt „Datenbank auf netcup“.
 
 Helfer finden eine Kurzfassung in der App unten unter „Datenschutz“. Der Text dort ist ein Entwurf aus der Technik. Ob er rechtlich genügt, prüft Norbert.
 

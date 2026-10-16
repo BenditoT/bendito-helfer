@@ -2,7 +2,7 @@
 
 Schichtplan der ehrenamtlichen Helfer beim Bendito Tango Marathon (30.10.–01.11.2026). Die Orga weist Schichten zu, Helfer sehen ihren Plan am Telefon und tauschen untereinander.
 
-Version 5.0.0. Dieses Repository ist öffentlich und enthält **keine Personendaten und keine Geheimnisse**, auch nicht in der Historie. Namen stehen nur in der Datenbank.
+Version 5.0.1. Dieses Repository ist öffentlich und enthält **keine Personendaten und keine Geheimnisse**, auch nicht in der Historie. Namen stehen nur in der Datenbank.
 
 ## Aufbau
 

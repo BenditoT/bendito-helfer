@@ -1,0 +1,40 @@
+#!/bin/bash
+# Spielt den neuesten Dump in eine Wegwerf-Datenbank und vergleicht die Zeilenzahlen.
+# Die Wegwerf-Datenbank wird danach gelöscht. Keine Dump-Inhalte ausgeben.
+set -euo pipefail
+
+dump=${1:-/home/nk/bendito-backups/latest.dump}
+if [ ! -f "$dump" ]; then
+  echo "restore probe: dump missing" >&2
+  exit 1
+fi
+
+docker exec bendito-db psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
+  -c "DROP DATABASE IF EXISTS restore_probe;" \
+  -c "CREATE DATABASE restore_probe;"
+
+docker cp "$dump" bendito-db:/tmp/restore_probe.dump
+set +e
+docker exec bendito-db pg_restore -U postgres --no-owner --no-privileges -d restore_probe /tmp/restore_probe.dump >/tmp/bendito-restore.err 2>&1
+rc=$?
+set -e
+docker exec bendito-db rm -f /tmp/restore_probe.dump
+
+orig_shifts=$(docker exec bendito-db psql -U postgres -d postgres -tAc "select count(*) from public.hp_shifts")
+orig_helpers=$(docker exec bendito-db psql -U postgres -d postgres -tAc "select count(*) from public.hp_helpers")
+probe_shifts=$(docker exec bendito-db psql -U postgres -d restore_probe -tAc "select count(*) from public.hp_shifts")
+probe_helpers=$(docker exec bendito-db psql -U postgres -d restore_probe -tAc "select count(*) from public.hp_helpers")
+
+docker exec bendito-db psql -U postgres -d postgres -v ON_ERROR_STOP=1 \
+  -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'restore_probe' AND pid <> pg_backend_pid();" \
+  -c "DROP DATABASE restore_probe;"
+
+rm -f /tmp/bendito-restore.err
+echo "shifts ${orig_shifts} ${probe_shifts}"
+echo "helpers ${orig_helpers} ${probe_helpers}"
+echo "pg_restore_exit ${rc}"
+if [ "$orig_shifts" != "$probe_shifts" ] || [ "$orig_helpers" != "$probe_helpers" ]; then
+  echo "restore probe: mismatch" >&2
+  exit 1
+fi
+echo "restore probe ok"

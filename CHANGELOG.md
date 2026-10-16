@@ -1,5 +1,9 @@
 # Changelog
 
+## 5.0.1 — 2026-10-16
+
+Datenbank auf eigenem Server. Die App spricht `https://db.benditotango.de` an. Der Rückweg zur Supabase-Cloud bleibt bis nach dem Marathon eingerichtet.
+
 ## 5.0.0 — 2026-10-04
 
 Erste gemeinsam nutzbare Fassung. Der bisherige Stand lief nur in einem einzelnen Browser.

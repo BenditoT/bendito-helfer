@@ -1,0 +1,78 @@
+# Bendito, zweiter Stack. teams bleibt unverändert.
+# Gateway nur auf 127.0.0.1:8100. Images sind die Digests aus dem teams-Pin.
+# Ungestartete Dienste tragen ebenfalls den Präfix bendito-, damit ein
+# versehentliches „compose up“ nicht die festen Namen des teams-Stacks trifft.
+# supavisor veröffentlicht keine Ports.
+
+x-bendito-log: &bendito-log
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  studio:
+    image: supabase/studio:2026.09.07-sha-7996410@sha256:0f797270d236090c79fd26a97a1e5d1cf7ec5f36e93b9b4c3c453e1cb1aeadab
+    platform: linux/amd64
+    container_name: bendito-studio
+    mem_limit: 512m
+    logging: *bendito-log
+  api-gw:
+    image: envoyproxy/envoy:v1.39.1@sha256:be87c8b52663c1164a5bdf3c5419017a269cb3d8c74be1ec93638a71f1ffbd4b
+    platform: linux/amd64
+    container_name: bendito-envoy
+    mem_limit: 128m
+    ports: !override
+      - "127.0.0.1:8100:8000"
+    logging: *bendito-log
+  auth:
+    image: supabase/gotrue:v2.196.0@sha256:7e813221b93fbf54b515036438550e483bfaf057b9db52fe9bc1ce91c47e817e
+    platform: linux/amd64
+    container_name: bendito-auth
+    mem_limit: 256m
+    logging: *bendito-log
+  rest:
+    image: postgrest/postgrest:v14.17@sha256:aa7e96af2d01219a09bc00c75de28171b1f9fda17ea455a931e4fb6d317089e0
+    platform: linux/amd64
+    container_name: bendito-rest
+    mem_limit: 256m
+    logging: *bendito-log
+  meta:
+    image: supabase/postgres-meta:v0.99.0@sha256:09b00cdd401f830cc8db5c7da14468e99d04a63900371b1ec06463674ac4877e
+    platform: linux/amd64
+    container_name: bendito-meta
+    mem_limit: 256m
+    logging: *bendito-log
+  functions:
+    image: supabase/edge-runtime:v1.76.2@sha256:b331c6422f4f4bebd6052357da5f3c87610128c8cb530390ca024eb68cf4bf2e
+    platform: linux/amd64
+    container_name: bendito-edge-functions
+    mem_limit: 512m
+    logging: *bendito-log
+  db:
+    image: supabase/postgres:17.6.1.136@sha256:5a4314708484bec672de2c09653a5c01fb1c84a998564ac231b0325e2238ed5b
+    platform: linux/amd64
+    container_name: bendito-db
+    mem_limit: 1g
+    logging: *bendito-log
+  realtime:
+    image: supabase/realtime:v2.134.10@sha256:c1d078d929608f3eb4d441e30317bbdccc1bfcc1169efa3d1a26d4252417cc76
+    platform: linux/amd64
+    container_name: bendito-realtime
+    logging: *bendito-log
+  storage:
+    image: supabase/storage-api:v1.74.0@sha256:63da55733ce9d7592d860739acb94f0b6189d880b7565d247ee5b195be854db1
+    platform: linux/amd64
+    container_name: bendito-storage
+    logging: *bendito-log
+  imgproxy:
+    image: darthsim/imgproxy:v3.31.4@sha256:80200afeaa85c4abb58bbcb84deadab6d6cf5c79ac7af0694ff22e2b5de1477b
+    platform: linux/amd64
+    container_name: bendito-imgproxy
+    logging: *bendito-log
+  supavisor:
+    image: supabase/supavisor:2.9.12@sha256:68ec476a3cfed150fb067995e12bd751b4dd5872acb9f7d9ce762d63ffd4f64d
+    platform: linux/amd64
+    container_name: bendito-pooler
+    ports: !reset []
+    logging: *bendito-log
