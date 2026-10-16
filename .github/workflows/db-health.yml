@@ -8,4 +8,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Auth-Health
-        run: curl -fsS -H "apikey: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzkyMTQwMTMxLCJleHAiOjIxMDc1MDAxMzF9.PRh_r-UX8bVxGWfRS6secrs7IYRiD3Avmcj_smdqM2E" https://db.benditotango.de/auth/v1/health
+        env:
+          ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzkyMTQwMTMxLCJleHAiOjIxMDc1MDAxMzF9.PRh_r-UX8bVxGWfRS6secrs7IYRiD3Avmcj_smdqM2E"
+        run: curl -fsS -H "apikey: $ANON_KEY" https://db.benditotango.de/auth/v1/health
