@@ -11,7 +11,7 @@ Betrieb der zweiten Supabase-Installation neben dem Stack `teams`. Der `teams`-S
 - Realtime, Storage, imgproxy und der Pooler sind nicht gestartet. Ihre Containernamen tragen trotzdem den Präfix `bendito-`, und der Pooler hat keine Ports, damit ein versehentliches `compose up` nicht die Namen des `teams`-Stacks trifft.
 - `COMPOSE_FILE` in der Server-`.env` ist `docker-compose.yml:docker-compose.override.yml`. Ohne den zweiten Eintrag ignoriert Compose die Override-Datei, weil die Beispiel-Umgebung `COMPOSE_FILE` setzt.
 - Die Login-Funktion liegt in `volumes/functions/hp-login/`. Mitkopiert ist `volumes/functions/deno.jsonc`, weil der Router diese Import-Map fest verdrahtet.
-- Am Gateway ist die Functions-Route auf die Herkunft `https://benditot.github.io` und auf localhost begrenzt. Die übrige Envoy-Vorlage erlaubt sonst jede Herkunft. Der Ausschnitt steht in der Route `functions-v1-all` von `volumes/api/envoy/lds.template.yaml`.
+- Am Gateway ist die Functions-Route auf die Herkünfte `https://benditot.github.io`, `https://helfer.benditotango.de`, `https://carpool.benditotango.de` und auf localhost begrenzt. Die übrige Envoy-Vorlage erlaubt sonst jede Herkunft. Der Ausschnitt steht in der Route `functions-v1-all` von `volumes/api/envoy/lds.template.yaml`. Die Function liest weitere Herkünfte aus `HP_ALLOWED_ORIGINS`.
 
 ## Sicherung
 

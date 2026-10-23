@@ -49,6 +49,8 @@ services:
     container_name: bendito-edge-functions
     mem_limit: 512m
     logging: *bendito-log
+    environment:
+      HP_ALLOWED_ORIGINS: https://helfer.benditotango.de
   db:
     image: supabase/postgres:17.6.1.136@sha256:5a4314708484bec672de2c09653a5c01fb1c84a998564ac231b0325e2238ed5b
     platform: linux/amd64
