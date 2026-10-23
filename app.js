@@ -1,4 +1,4 @@
-/* Bendito Helferplan 5.0.1
+/* Bendito Helferplan 5.0.2
  *
  * Preact + htm ohne Build-Schritt. Alle Fachdaten liegen in der Datenbank und
  * kommen über hp_state(); geändert wird nur über die hp_-Funktionen. Im Browser
@@ -400,6 +400,7 @@
           ${props.message ? html`<div class="err" role="alert">${props.message}</div>` : null}
           ${mode === 'helper' ? html`<div key="helper">
             <p>Bitte öffne deinen persönlichen Link. Du hast ihn von der Orga bekommen.</p>
+            <a class="login-link" href="mithilfe.html">Mithilfe anbieten</a>
             <button type="button" class="login-link" onClick=${function () { setMode('admin'); }}>Orga-Login</button>
           </div>` : html`<div key="admin">
             <form onSubmit=${submit}>
@@ -667,6 +668,8 @@
     var [notice, setNotice] = useState(null);
     var [busy, setBusy] = useState(false);
     var [view, setViewRaw] = useState(prefs.view || 'board');
+    var [offers, setOffers] = useState(null);
+    var [offersErr, setOffersErr] = useState('');
     var [day, setDayRaw] = useState(prefs.day || 'fri');
     var [sel, setSel] = useState(null);     // gewählter Helfer zum Zuweisen (Orga)
     var [dd, setDd] = useState(null);       // offene Auswahlliste einer Schicht
@@ -814,6 +817,18 @@
       }
     }, [phase, view, d ? d.unread : 0]);
 
+    function loadOffers() {
+      setOffersErr('');
+      return rpc('hp_admin_list_help_offers', {}).then(function (data) {
+        setOffers(Array.isArray(data) ? data : []);
+      }, function (e) {
+        setOffersErr(e && e.kind === 'denied' ? 'Dafür hast du keine Berechtigung.' : 'Die Antworten ließen sich nicht laden.');
+      });
+    }
+    useEffect(function () {
+      if (phase === 'app' && view === 'offers') loadOffers();
+    }, [phase, view]);
+
     // Führt eine ändernde Funktion aus, zeigt das Ergebnis und lädt den Plan neu.
     function act(name, args, opts) {
       opts = opts || {};
@@ -930,7 +945,19 @@
     }
     function rejectSwap(w) { act('hp_swap_reject', {p_swap: w.id}, {okText: 'Anfrage abgelehnt.'}); }
     function cancelSwap(w) { act('hp_swap_cancel', {p_swap: w.id}, {okText: 'Anfrage zurückgezogen.'}); }
-    function doExport() { downloadJson(buildExport(d), 'bendito-helferplan-' + new Date().toISOString().slice(0, 10) + '.json'); }
+    function doExport() {
+      var file = 'bendito-helferplan-' + new Date().toISOString().slice(0, 10) + '.json';
+      var base = buildExport(d);
+      if (!d.isAdmin) { downloadJson(base, file); return; }
+      rpc('hp_admin_list_help_offers', {}).then(function (rows) {
+        base.mithilfe = Array.isArray(rows) ? rows : [];
+        base.hinweis = 'Diese Datei enthält Namen und, aus der Mithilfe-Abfrage, E-Mail-Adressen. Nicht weitergeben, nach dem Event löschen.';
+        downloadJson(base, file);
+      }, function () {
+        base.mithilfe_hinweis = 'Die Mithilfe-Abfrage ließ sich nicht mitsichern.';
+        downloadJson(base, file);
+      });
+    }
     function newLink(h) {
       var go = function () {
         setDlg(null);
@@ -1369,10 +1396,10 @@
       if (dlg.type === 'privacy') {
         var until = fmtDay(d.settings.purge_after);
         return html`<${Dialog} title="Datenschutz" onClose=${close}>
-          <p class="dlg-p"><strong>Was gespeichert wird:</strong> dein Anzeigename, eine Farbe, dein bevorzugter Kontaktweg (ohne Nummer oder Adresse), ob du zum Aufbau-Team gehörst, deine Schichten und deine Tauschanfragen samt Notiz.</p>
+          <p class="dlg-p"><strong>Was gespeichert wird:</strong> dein Anzeigename, eine Farbe, dein bevorzugter Kontaktweg (ohne Nummer oder Adresse), ob du zum Aufbau-Team gehörst, deine Schichten und deine Tauschanfragen samt Notiz. Wer das Formular „Mithilfe anbieten“ ausfüllt, speichert zusätzlich Name, E-Mail, Telefon, die Antworten zu Donnerstag, Montag, Pre-Milonga und Abschlussessen sowie eine Anmerkung. Diese Antworten sieht nur die Orga.</p>
           <p class="dlg-p"><strong>Wer es sieht:</strong> Name, Farbe, Kontaktweg, Aufbau-Team und Schichten sehen alle Helfer mit persönlichem Link und die Orga. Tauschanfragen sehen nur die Beteiligten und die Orga.</p>
           <p class="dlg-p"><strong>Technisch dazu:</strong> ein Protokoll ohne Namen, wann welche Aktion lief. Beim Öffnen eines Links wird für etwa einen Tag eine Prüfsumme der Internetadresse gespeichert, um Ausprobieren zu bremsen. Die Adresse selbst wird nicht gespeichert.</p>
-          <p class="dlg-p"><strong>Wo es liegt:</strong> in einer Datenbank beim Dienst Supabase. Die Seite selbst kommt von GitHub Pages.</p>
+          <p class="dlg-p"><strong>Wo es liegt:</strong> auf dem eigenen Server in Nürnberg. Die Seite selbst kommt von GitHub Pages.</p>
           <p class="dlg-p"><strong>Auf deinem Gerät:</strong> nur deine Anmeldung und zwei Anzeige-Einstellungen. Keine Statistik, keine Werbung.</p>
           <p class="dlg-p"><strong>Löschung:</strong> Nach dem Event werden die Login-Links gesperrt und die Helferdaten${until ? ' bis zum ' + until : ''} aus der App gelöscht. Die Orga sichert den Plan vorher als Datei auf ihrem eigenen Gerät.</p>
           <p class="dlg-p">Fragen, Auskunft oder Löschwunsch: bitte direkt an die Orga.</p>
@@ -1383,7 +1410,11 @@
       if (dlg.type === 'purge') {
         return html`<${PurgeDialog} disabled=${off} onExport=${doExport} onClose=${close}
           onPurge=${function () { setDlg(null); act('hp_admin_purge', {p_confirm: 'LOESCHEN'}, {
-            okText: function (r) { return 'Gelöscht: ' + r.helpers + ' Helfer, ' + r.assignments + ' Zuweisungen, ' + r.swaps + ' Tauschvorgänge.'; },
+            okText: function (r) {
+              var t = 'Gelöscht: ' + r.helpers + ' Helfer, ' + r.assignments + ' Zuweisungen, ' + r.swaps + ' Tauschvorgänge.';
+              if (r.offers) t += ' ' + r.offers + ' Mithilfe-Antworten.';
+              return t;
+            },
             onOk: function (r) {
               if (r.auth_left > 0) setNotice({type: 'err', text: 'Die Helferdaten sind gelöscht, aber ' + r.auth_left + ' Anmeldekonten ließen sich nicht entfernen. Bitte im Supabase-Dashboard unter „Authentication“ die Konten mit der Adresse hp-…@helfer.bendito.invalid von Hand löschen.'});
             }
@@ -1423,11 +1454,48 @@
       return null;
     }
 
+    function renderOffers() {
+      var rows = offers || [];
+      var choice = {ja: 'Ja', nein: 'Nein', vielleicht: 'Mal sehen'};
+      function n(key, val) { return rows.filter(function (o) { return o[key] === val; }).length; }
+      function line(label, value) { return label + ': ' + (choice[value] || '–'); }
+      return html`<div class="offers">
+        <h2>Mithilfe und Aufenthalt</h2>
+        <p class="s-note">Wer schon am Donnerstag kommt, bis Montag bleibt, bei der Pre-Milonga oder beim Abschlussessen dabei ist. Das Formular ist offen, die Antworten sieht nur die Orga.</p>
+        <div class="offer-counts">
+          <span>${rows.length} Rückmeldungen</span>
+          <span>Donnerstag ja: ${n('arrive_thu', 'ja')}</span>
+          <span>Montag ja: ${n('stay_mon', 'ja')}</span>
+          <span>Pre-Milonga ja: ${n('pre_milonga', 'ja')}</span>
+          <span>Abschlussessen ja: ${n('dinner_sun', 'ja')}</span>
+        </div>
+        <div class="btn-row">
+          <button type="button" class="btn btn-gold" onClick=${loadOffers}>Neu laden</button>
+          <a class="btn btn-ghost" href="mithilfe.html">Formular öffnen</a>
+        </div>
+        ${offersErr ? html`<p class="empty-msg">${offersErr}</p>` : null}
+        ${!offersErr && offers && rows.length === 0 ? html`<p class="empty-msg">Noch keine Rückmeldung.</p>` : null}
+        ${rows.map(function (o) {
+          return html`<article class="offer-card" key=${o.email}>
+            <h3>${o.name}</h3>
+            <div class="mini-sub">${o.email}${o.phone ? ' · ' + o.phone : ''} · ${fmtDT(o.updated_at)}</div>
+            <ul>
+              <li>${line('Donnerstag, 29.10.', o.arrive_thu)}</li>
+              <li>${line('Montag, 2.11.', o.stay_mon)}</li>
+              <li>${line('Pre-Milonga', o.pre_milonga)}</li>
+              <li>${line('Abschlussessen Sonntag', o.dinner_sun)}</li>
+            </ul>
+            ${o.note ? html`<p>${o.note}</p>` : null}
+          </article>`;
+        })}
+      </div>`;
+    }
+
     // ----- Rahmen -----
     var tabs = [['board', 'Board', 0]];
     if (isHelper) tabs.push(['myplan', 'Mein Plan', 0]);
     tabs.push(['helpers', 'Helfer', 0], ['howto', 'Anleitungen', 0]);
-    if (isAdmin) tabs.push(['swaps', 'Tausch', d.pendingMoves.length], ['settings', 'Einstellungen', 0]);
+    if (isAdmin) tabs.push(['offers', 'Mithilfe', offers ? offers.length : 0], ['swaps', 'Tausch', d.pendingMoves.length], ['settings', 'Einstellungen', 0]);
     if (isHelper) tabs.push(['myswaps', 'Mein Tausch', d.incoming.length], ['inbox', 'Hinweise', d.unread]);
     var known = tabs.some(function (t) { return t[0] === view; }) || (view === 'print' && isAdmin);
     var cur = known ? view : 'board';
@@ -1437,6 +1505,7 @@
     else if (cur === 'myplan') body = renderMyPlan();
     else if (cur === 'helpers') body = renderHelpers();
     else if (cur === 'howto') body = renderHowto();
+    else if (cur === 'offers') body = renderOffers();
     else if (cur === 'swaps') body = renderAdminSwaps();
     else if (cur === 'settings') body = renderSettings();
     else if (cur === 'myswaps') body = renderMySwaps();

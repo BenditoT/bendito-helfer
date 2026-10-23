@@ -155,8 +155,15 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 .st-rejected, .st-expired, .st-cancelled { color: var(--red); }
 
 /* HINWEISE */
-.inbox { padding: 24px 28px; max-width: 760px; }
-.inbox h2 { font-size: 16px; font-weight: 700; margin-bottom: 16px; }
+.inbox, .offers { padding: 24px 28px; max-width: 760px; }
+.offers { max-width: 880px; }
+.offer-counts { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
+.offer-counts span { background: #fff; border: 1px solid var(--border); border-radius: 999px; padding: 6px 12px; font-size: 13px; font-weight: 700; }
+.offer-card { background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 10px; }
+.offer-card h3 { margin: 0 0 4px; font-size: 16px; }
+.offer-card ul { margin: 8px 0 0; padding-left: 18px; }
+.offer-card li { margin: 2px 0; }
+.inbox h2, .offers h2 { font-size: 16px; font-weight: 700; margin-bottom: 16px; }
 .msg-card { background: #fff; border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; margin-bottom: 8px; }
 .msg-card.unread { border-left: 3px solid var(--purple); background: var(--purple-bg); }
 .msg-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 6px; }
@@ -236,6 +243,7 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 .check { display: flex; align-items: center; gap: 10px; min-height: 44px; font-size: 14px; color: var(--text); }
 .check input { width: 22px; height: 22px; flex-shrink: 0; }
 .btn { padding: 10px 16px; min-height: 44px; border-radius: 6px; font-size: 14px; font-weight: 700; border: none; transition: all 0.15s; }
+a.btn { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
 .btn-gold { background: var(--gold-dark); color: #fff; }
 .btn-purple { background: var(--purple-dark); color: #fff; }
 .btn-red { background: var(--red); color: #fff; }
@@ -286,6 +294,7 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 .login-box .btn { width: 100%; margin-bottom: 8px; }
 .login-box .err { color: #FFB4A9; font-size: 14px; margin-bottom: 12px; line-height: 1.45; }
 .login-link { background: none; border: none; color: rgba(255,255,255,0.72); font-size: 13px; text-decoration: underline; padding: 10px; min-height: 44px; }
+a.login-link { display: inline-block; }
 .login-ver { color: rgba(255,255,255,0.45); font-size: 11px; margin-top: 14px; }
 
 /* DRUCKANSICHT */
@@ -302,7 +311,7 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 .footer { padding: 18px 28px 96px; font-size: 11px; color: var(--text2); text-align: center; }
 
 @media (max-width: 768px) {
-  .header, .board, .h-overview, .swap-list, .settings, .howto, .my-plan, .inbox, .print-view, .status, .footer { padding-left: 14px; padding-right: 14px; }
+  .header, .board, .h-overview, .swap-list, .settings, .howto, .my-plan, .inbox, .offers, .print-view, .status, .footer { padding-left: 14px; padding-right: 14px; }
   .nav, .tabs, .hbar, .assign-hint { padding-left: 14px; padding-right: 14px; }
   .notice { margin-left: 14px; margin-right: 14px; }
   .grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }

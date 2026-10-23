@@ -2,7 +2,7 @@
 
 Schichtplan der ehrenamtlichen Helfer beim Bendito Tango Marathon (30.10.–01.11.2026). Die Orga weist Schichten zu, Helfer sehen ihren Plan am Telefon und tauschen untereinander.
 
-Version 5.0.1. Dieses Repository ist öffentlich und enthält **keine Personendaten und keine Geheimnisse**, auch nicht in der Historie. Namen stehen nur in der Datenbank.
+Version 5.0.2. Dieses Repository ist öffentlich und enthält **keine Personendaten und keine Geheimnisse**, auch nicht in der Historie. Namen stehen nur in der Datenbank. Die Mithilfe-Abfrage (`mithilfe.html`) speichert die Antworten nur in der Datenbank.
 
 ## Aufbau
 
@@ -14,7 +14,9 @@ Version 5.0.1. Dieses Repository ist öffentlich und enthält **keine Personenda
 | `assets/` | Logo. |
 | `supabase/migrations/` | Datenbank: Tabellen `hp_…`, Funktionen, Schichtraster, Rechte. Interne Hilfsfunktionen liegen im Schema `hp_private`. |
 | `supabase/functions/hp-login/` | Edge Function, die den persönlichen Link gegen eine Sitzung tauscht. `supabase/config.toml` stellt sie ohne JWT-Prüfung bereit. |
-| `supabase/tests/` | SQL-Tests für Tausch (T1–T11) und Rechte (R1–R20), Rechteprüfung für den laufenden Betrieb (`check_rechte.sql`), Testhelfer. |
+| `supabase/functions/hp-offer/` | Edge Function für die Mithilfe-Abfrage. Ebenfalls ohne JWT-Prüfung, die Datenbank prüft den Inhalt. |
+| `mithilfe.html` | Offenes Formular: Donnerstag, Montag, Pre-Milonga, Abschlussessen. |
+| `supabase/tests/` | SQL-Tests für Tausch (T1–T11) und Rechte (R1–R21), Rechteprüfung für den laufenden Betrieb (`check_rechte.sql`), Testhelfer. |
 | `tests/` | Statische Prüfungen, SQL-Testlauf, HTTP-Tests, Browser-Testlauf, Schranke vor der Veröffentlichung. |
 | `docs/` | [Betrieb](docs/BETRIEB.md), [Ankündigung](docs/ANKUENDIGUNG.md), [Review](docs/REVIEW-5.0.0.md), [Testprotokoll](docs/TESTLAUF-5.0.0.md). |
 

@@ -29,7 +29,7 @@ function runSuite(file) {
 
 for (const [name, file, expected] of [
   ['Tauschtests', 'supabase/tests/t_swaps.sql', ['T1', 'T2', 'T3', 'T4', 'T5', 'T5b', 'T6', 'T6b', 'T7', 'T8', 'T9', 'T10', 'T10b', 'T11']],
-  ['Rechtetests', 'supabase/tests/t_rights.sql', Array.from({ length: 20 }, (_, i) => 'R' + (i + 1))],
+  ['Rechtetests', 'supabase/tests/t_rights.sql', Array.from({ length: 21 }, (_, i) => 'R' + (i + 1))],
 ]) {
   test(name, { skip }, async (t) => {
     const results = runSuite(file);

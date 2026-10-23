@@ -41,12 +41,14 @@ let cfg = readFileSync(cfgPath, 'utf8');
 cfg = cfg.replace(/supabaseUrl:\s*'[^']*'/, `supabaseUrl: '${url}'`).replace(/supabaseAnonKey:\s*'[^']*'/, `supabaseAnonKey: '${key}'`);
 writeFileSync(cfgPath, cfg);
 
-const htmlPath = path.join(root, 'index.html');
-const html = readFileSync(htmlPath, 'utf8');
-const next = html.replace(/(<meta http-equiv="Content-Security-Policy" content="[^"]*?)connect-src [^;"]+/, `$1connect-src ${url || "'none'"}`);
-if (next === html && !html.includes(`connect-src ${url || "'none'"}`)) {
-  console.error('Content-Security-Policy in index.html nicht gefunden.');
-  process.exit(1);
+for (const name of ['index.html', 'mithilfe.html']) {
+  const htmlPath = path.join(root, name);
+  const html = readFileSync(htmlPath, 'utf8');
+  const next = html.replace(/(<meta http-equiv="Content-Security-Policy" content="[^"]*?)connect-src [^;"]+/, `$1connect-src ${url || "'none'"}`);
+  if (next === html && !html.includes(`connect-src ${url || "'none'"}`)) {
+    console.error('Content-Security-Policy in ' + name + ' nicht gefunden.');
+    process.exit(1);
+  }
+  writeFileSync(htmlPath, next);
 }
-writeFileSync(htmlPath, next);
 console.log(url ? `Verbunden mit ${url}` : 'Verbindung entfernt');

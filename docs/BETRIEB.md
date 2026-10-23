@@ -1,4 +1,4 @@
-# Betrieb: Bendito Helferplan 5.0.1
+# Betrieb: Bendito Helferplan 5.0.2
 
 Für die Orga. Bendito Tango Marathon, Fr 30.10. bis So 01.11.2026.
 
@@ -91,6 +91,8 @@ Gelöscht wird von Hand. Eine automatische Löschung gibt es nicht, weil vorher 
 ## Was gespeichert wird
 
 Pro Helfer: Anzeigename, Farbe, bevorzugter Kontaktweg ohne Nummer, Aufbau-Team ja oder nein, die zugewiesenen Schichten und Tauschvorgänge samt Notiz. Der Login-Link liegt nur als Prüfsumme in der Datenbank. Ein Protokoll hält fest, wann welche Aktion lief, ohne Namen. Die Daten liegen auf dem eigenen Server bei netcup in Nürnberg. Der Rückweg zur Supabase-Cloud in Frankfurt steht im Abschnitt „Datenbank auf netcup“.
+
+Die Mithilfe-Abfrage (`mithilfe.html`) speichert dazu Name, E-Mail, optional Telefon und vier Antworten: Donnerstag 29.10. schon da, Montag 2.11. noch im Kloster, Helfer-Pre-Milonga, Abschlussessen am Sonntagabend. Dieselbe E-Mail überschreibt die vorige Antwort. Sehen kann das nur die Orga, im Reiter „Mithilfe“ und in der Sicherungsdatei. Gelöscht wird es mit „Helferdaten löschen“, zusammen mit dem übrigen Plan, bis zum 15.11.2026. Die Sicherung enthält dann auch diese Adressen und bleibt auf dem eigenen Gerät.
 
 Helfer finden eine Kurzfassung in der App unten unter „Datenschutz“. Der Text dort ist ein Entwurf aus der Technik. Ob er rechtlich genügt, prüft Norbert.
 

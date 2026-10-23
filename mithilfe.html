@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; connect-src https://db.benditotango.de; base-uri 'none'; form-action 'none'">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="referrer" content="no-referrer">
+  <title>Mithilfe anbieten — Bendito Tango Marathon</title>
+  <link rel="stylesheet" href="mithilfe.css?v=5.0.2">
+</head>
+<body>
+  <main class="wrap">
+    <header class="top">
+      <img src="assets/logo.png" alt="Bendito Tango Marathon">
+      <p class="kicker">Kloster Pielenhofen · 30. Oktober bis 1. November 2026</p>
+      <h1>Mithilfe anbieten</h1>
+    </header>
+    <p>Wer schon am Tag vorher kommen möchte oder noch bis Montag im Kloster bleiben will: kein Problem. Helfende Hände sind willkommen, und es ist schön, ein bisschen Gemeinschaft zu haben.</p>
+    <p>Wenn am Donnerstag genug Leute da sind, gibt es vielleicht eine kleine Helfer-Pre-Milonga. Am Sonntagabend, wenn alles verräumt ist, setzen wir uns zum Abschlussessen zusammen.</p>
+
+    <form id="form">
+      <div class="field">
+        <label for="name">Name</label>
+        <input id="name" name="name" type="text" autocomplete="name" maxlength="80" required>
+      </div>
+      <div class="field">
+        <label for="email">E-Mail</label>
+        <input id="email" name="email" type="email" autocomplete="email" maxlength="120" required>
+      </div>
+      <div class="field">
+        <label for="phone">Telefon, wenn du magst</label>
+        <input id="phone" name="phone" type="tel" autocomplete="tel" maxlength="40" inputmode="tel">
+      </div>
+
+      <fieldset>
+        <legend>Ich kann schon am Donnerstag, 29. Oktober, kommen und mit anpacken.</legend>
+        <div class="choices" role="radiogroup" aria-label="Donnerstag anreisen">
+          <label><input type="radio" name="arrive" value="ja" required> Ja</label>
+          <label><input type="radio" name="arrive" value="vielleicht"> Mal sehen</label>
+          <label><input type="radio" name="arrive" value="nein"> Nein</label>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Ich kann bis Montag, 2. November, im Kloster übernachten.</legend>
+        <div class="choices" role="radiogroup" aria-label="Montag bleiben">
+          <label><input type="radio" name="stay" value="ja" required> Ja</label>
+          <label><input type="radio" name="stay" value="vielleicht"> Mal sehen</label>
+          <label><input type="radio" name="stay" value="nein"> Nein</label>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Bei einer kleinen Helfer-Pre-Milonga am Donnerstag wäre ich dabei.</legend>
+        <div class="choices" role="radiogroup" aria-label="Pre-Milonga">
+          <label><input type="radio" name="milonga" value="ja" required> Ja</label>
+          <label><input type="radio" name="milonga" value="vielleicht"> Mal sehen</label>
+          <label><input type="radio" name="milonga" value="nein"> Nein</label>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>Beim Abschlussessen am Sonntagabend, wenn alles verräumt ist, bin ich dabei.</legend>
+        <div class="choices" role="radiogroup" aria-label="Abschlussessen">
+          <label><input type="radio" name="dinner" value="ja" required> Ja</label>
+          <label><input type="radio" name="dinner" value="vielleicht"> Mal sehen</label>
+          <label><input type="radio" name="dinner" value="nein"> Nein</label>
+        </div>
+      </fieldset>
+
+      <div class="field">
+        <label for="note">Anmerkung</label>
+        <textarea id="note" name="note" maxlength="400" rows="4" placeholder="Zum Beispiel Ankunftszeit oder wobei du mit anpacken kannst."></textarea>
+      </div>
+      <div class="honey">
+        <label for="company">Firma</label>
+        <input id="company" name="company" type="text" tabindex="-1" autocomplete="off">
+      </div>
+      <button id="send" type="submit">Rückmeldung schicken</button>
+    </form>
+    <p id="msg" class="msg" role="status"></p>
+
+    <p class="fine">Name, E-Mail und Telefon brauchen wir nur für Anreise, Betten und die beiden Essen. Die Angaben liegen auf unserem Server in Nürnberg und werden bis zum 15. November 2026 gelöscht. Keine Weitergabe, kein Newsletter. Dieselbe E-Mail noch einmal schicken ersetzt die vorige Antwort.</p>
+    <p class="fine"><a href="index.html">Zum Helferplan</a></p>
+  </main>
+  <script src="config.js?v=5.0.2"></script>
+  <script src="mithilfe.js?v=5.0.2"></script>
+</body>
+</html>

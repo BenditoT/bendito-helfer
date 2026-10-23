@@ -1,4 +1,4 @@
--- Rechte- und Sicherheitstests R1–R20 (Sprint 4.1 und Akzeptanz 1.4, 2.5).
+-- Rechte- und Sicherheitstests R1–R21 (Sprint 4.1 und Akzeptanz 1.4, 2.5).
 --
 -- Läuft mit synthetischen Daten. Jeder Fall wird einzeln zurückgerollt, am Ende
 -- bricht der Block mit dem Ergebnis ab und rollt damit auch die Testdaten
@@ -22,7 +22,8 @@ declare
   h_off uuid;                      -- deaktivierter Helfer
   h_real uuid;                     -- kein Testhelfer
   tables text[] := array['hp_helpers', 'hp_admins', 'hp_shifts', 'hp_assignments', 'hp_swaps',
-                         'hp_notifications', 'hp_settings', 'hp_audit', 'hp_login_attempts'];
+                         'hp_notifications', 'hp_settings', 'hp_audit', 'hp_login_attempts',
+                         'hp_help_offers', 'hp_offer_rate'];
   client_rpcs text[] := array[
     'hp_my_context()', 'hp_state()', 'hp_mark_read(bigint[])',
     'hp_swap_request(text,text,text)', 'hp_swap_accept(bigint)', 'hp_swap_reject(bigint)', 'hp_swap_cancel(bigint)',
@@ -30,7 +31,7 @@ declare
     'hp_admin_upsert_helper(uuid,text,text,text,boolean,integer,boolean)', 'hp_admin_add_helpers(text[],boolean)',
     'hp_admin_deactivate_helper(uuid,boolean)', 'hp_admin_reactivate_helper(uuid)',
     'hp_admin_set_setting(text,jsonb)', 'hp_admin_remove_test_data()', 'hp_admin_purge(text)',
-    'hp_admin_new_login_code(uuid)', 'hp_admin_revoke_login(uuid)'];
+    'hp_admin_new_login_code(uuid)', 'hp_admin_revoke_login(uuid)', 'hp_admin_list_help_offers()'];
   res jsonb := '[]'::jsonb;
   r jsonb;
   r2 jsonb;
@@ -82,6 +83,15 @@ begin
   -- ------------------------------------------------------------ R1: anon liest keine Zeile
   begin
     bad := '';
+    -- Die beiden neuen Tabellen sind im Raster leer. Eine Zeile je Tabelle,
+    -- damit „anon sieht nichts“ wirklich geprüft wird. Die Zeilen rollen mit.
+    insert into public.hp_help_offers (
+      display_name, email, arrive_thu, stay_mon, pre_milonga, dinner_sun
+    ) values (
+      'Test Probe R', 'probe-r1@example.test', 'ja', 'nein', 'vielleicht', 'ja'
+    );
+    insert into public.hp_offer_rate (bucket, ip_hash, n)
+    values (date_trunc('hour', now()), repeat('d', 32), 1);
     foreach t in array tables loop
       execute format('select count(*) from public.%I', t) into n;
       if n = 0 then bad := bad || ' leer:' || t; end if;
@@ -326,7 +336,7 @@ begin
       else
         if has_function_privilege('authenticated', f.oid, 'execute') then bad := bad || ' zu viel:' || f.sig; end if;
       end if;
-      if f.proname in ('hp_login_lookup', 'hp_login_bind')
+      if f.proname in ('hp_login_lookup', 'hp_login_bind', 'hp_submit_help_offer')
          and not has_function_privilege('service_role', f.oid, 'execute') then
         bad := bad || ' service_role fehlt:' || f.sig;
       end if;
@@ -353,7 +363,7 @@ begin
     for f in
       select p.oid, p.proname, p.oid::regprocedure::text as sig
       from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
-      where ns.nspname = 'public' and p.proname like 'hp\_%' and p.proname not in ('hp_login_lookup', 'hp_login_bind')
+      where ns.nspname = 'public' and p.proname like 'hp\_%' and p.proname not in ('hp_login_lookup', 'hp_login_bind', 'hp_submit_help_offer')
     loop
       if has_function_privilege('service_role', f.oid, 'execute') then bad := bad || ' service_role zu viel:' || f.sig; end if;
     end loop;
@@ -551,8 +561,15 @@ begin
   -- ------------------------------------------------------------ R13: „Testdaten entfernen“ trifft nur Testhelfer
   begin
     perform set_config('request.jwt.claims', jsonb_build_object('sub', u_admin, 'role', 'authenticated')::text, true);
+    insert into public.hp_help_offers (
+      display_name, email, arrive_thu, stay_mon, pre_milonga, dinner_sun
+    ) values
+      ('Test Probe R13', 'probe-r13@example.test', 'ja', 'nein', 'vielleicht', 'ja'),
+      ('Test Echt R13', 'probe-r13@example.invalid', 'nein', 'nein', 'nein', 'nein');
     r := public.hp_admin_remove_test_data();
     assert (r ->> 'removed')::int = 3, 'entfernt: ' || r::text;
+    assert not exists (select 1 from public.hp_help_offers where email = 'probe-r13@example.test'), 'Test-Antwort übrig';
+    assert exists (select 1 from public.hp_help_offers where email = 'probe-r13@example.invalid'), 'echte Antwort mitgelöscht';
     assert (select count(*) from public.hp_helpers) = 1 and exists (select 1 from public.hp_helpers where id = h_real), 'falsche Helfer übrig';
     assert (select count(*) from public.hp_assignments) = 1 and exists (select 1 from public.hp_assignments where helper_id = h_real), 'Zuweisung des echten Helfers fehlt';
     assert (select count(*) from public.hp_swaps) = 0 and (select count(*) from public.hp_notifications) = 0, 'Tausch oder Benachrichtigung übrig';
@@ -569,16 +586,26 @@ begin
   begin
     perform set_config('request.jwt.claims', jsonb_build_object('sub', u_admin, 'role', 'authenticated')::text, true);
     select count(*) into n from public.hp_shifts;
+    insert into public.hp_help_offers (
+      display_name, email, arrive_thu, stay_mon, pre_milonga, dinner_sun
+    ) values (
+      'Test Probe R14', 'probe-r14@example.test', 'ja', 'ja', 'ja', 'ja'
+    );
+    insert into public.hp_offer_rate (bucket, ip_hash, n)
+    values (date_trunc('hour', now()), repeat('e', 32), 1);
     r := public.hp_admin_purge('ja');
     assert r ->> 'code' = 'CONFIRM_REQUIRED', 'ohne Bestätigung: ' || r::text;
     assert (select count(*) from public.hp_helpers) = 4, 'ohne Bestätigung gelöscht';
+    assert (select count(*) from public.hp_help_offers) = 1, 'Antwort ohne Bestätigung gelöscht';
     r := public.hp_admin_purge('LOESCHEN');
-    assert (r ->> 'ok')::boolean and (r ->> 'helpers')::int = 4, 'Löschung: ' || r::text;
+    assert (r ->> 'ok')::boolean and (r ->> 'helpers')::int = 4 and (r ->> 'offers')::int = 1, 'Löschung: ' || r::text;
     assert (r ->> 'auth_left')::int = 0, 'Anmeldekonten übrig: ' || r::text;
     assert exists (select 1 from auth.users where id = u_ci), 'Konto einer anderen Anwendung gelöscht';
     assert (select count(*) from public.hp_helpers) = 0 and (select count(*) from public.hp_assignments) = 0
        and (select count(*) from public.hp_swaps) = 0 and (select count(*) from public.hp_notifications) = 0
-       and (select count(*) from public.hp_login_attempts) = 0, 'Reste nach Löschung';
+       and (select count(*) from public.hp_login_attempts) = 0
+       and (select count(*) from public.hp_help_offers) = 0
+       and (select count(*) from public.hp_offer_rate) = 0, 'Reste nach Löschung';
     assert (select count(*) from public.hp_audit) = 1, 'Protokoll nicht geleert';
     assert (select count(*) from public.hp_shifts) = n, 'Schichtraster verändert';
     assert (select count(*) from public.hp_admins) = 1 and (select count(*) from public.hp_settings) >= 7, 'Orga oder Einstellungen gelöscht';
@@ -728,7 +755,9 @@ begin
       format('select public.hp_admin_assign(''zr3'', %L, true)', h_a),
       'select public.hp_admin_purge(''LOESCHEN'')',
       format('select public.hp_admin_new_login_code(%L)', h_a),
-      'select public.hp_admin_revoke_login(null)'
+      'select public.hp_admin_revoke_login(null)',
+      'select public.hp_admin_list_help_offers()',
+      'select public.hp_submit_help_offer(''x'', ''a@b.co'', '''', ''ja'', ''ja'', ''ja'', ''ja'', '''', '''', repeat(''ab'', 16))'
     ] loop
       begin
         execute q;
@@ -874,6 +903,63 @@ begin
     when sqlstate 'HPT00' then res := res || jsonb_build_object('t', 'R20', 'ok', true);
     when assert_failure then res := res || jsonb_build_object('t', 'R20', 'ok', false, 'err', sqlerrm);
     when others then res := res || jsonb_build_object('t', 'R20', 'ok', false, 'err', sqlerrm);
+  end;
+
+  -- ------------------------------------------------------------ R21: Mithilfe-Abfrage speichert nur Geprüftes, lesen darf nur die Orga
+  begin
+    bad := '';
+    perform set_config('role', 'anon', true);
+    begin
+      perform public.hp_submit_help_offer('Test Probe', 'probe-r21@example.test', '', 'ja', 'nein', 'vielleicht', 'ja', '', '', repeat('a', 32));
+      bad := bad || ' anon-schreiben';
+    exception when insufficient_privilege then null;
+    end;
+    begin
+      perform public.hp_admin_list_help_offers();
+      bad := bad || ' anon-lesen';
+    exception when insufficient_privilege then null;
+    end;
+    perform set_config('role', v_owner, true);
+    r := public.hp_submit_help_offer('Test Probe', 'keine mail', '', 'ja', 'ja', 'ja', 'ja', '', '', repeat('b', 32));
+    assert r ->> 'code' = 'INVALID_INPUT', 'ungültige Mail angenommen: ' || r::text;
+    r := public.hp_submit_help_offer('Test Probe', 'probe-r21@example.test', 'abc', 'ja', 'ja', 'ja', 'ja', '', '', repeat('b', 32));
+    assert r ->> 'code' = 'INVALID_INPUT', 'Telefon angenommen: ' || r::text;
+    r := public.hp_submit_help_offer('Test Probe', 'probe-r21@example.test', '', 'morgen', 'ja', 'ja', 'ja', '', '', repeat('b', 32));
+    assert r ->> 'code' = 'INVALID_INPUT', 'Antwort angenommen: ' || r::text;
+    r := public.hp_submit_help_offer('Bot', 'bot-r21@example.test', '', 'ja', 'ja', 'ja', 'ja', '', 'acme', repeat('b', 32));
+    assert (r ->> 'ok')::boolean, 'Köder abgelehnt: ' || r::text;
+    assert not exists (select 1 from public.hp_help_offers where email = 'bot-r21@example.test'), 'Köder gespeichert';
+    r := public.hp_submit_help_offer('Test Probe', 'probe-r21@example.test', '', 'ja', 'nein', 'vielleicht', 'ja', 'komme nachmittags', '', repeat('b', 32));
+    assert (r ->> 'ok')::boolean, 'gültige Antwort abgelehnt: ' || r::text;
+    r := public.hp_submit_help_offer('Test Probe Zwei', 'Probe-R21@example.test', '015112345678', 'nein', 'ja', 'nein', 'vielleicht', '', '', repeat('b', 32));
+    assert (r ->> 'ok')::boolean, 'Korrektur abgelehnt: ' || r::text;
+    assert (select count(*) from public.hp_help_offers) = 1, 'dieselbe Adresse legt eine zweite Zeile an';
+    assert (select display_name from public.hp_help_offers) = 'Test Probe Zwei', 'Name nicht ersetzt';
+    assert (select stay_mon from public.hp_help_offers) = 'ja', 'Montag nicht ersetzt';
+    insert into public.hp_offer_rate (bucket, ip_hash, n) values (date_trunc('hour', now()), repeat('c', 32), 8)
+      on conflict (bucket, ip_hash) do update set n = 8;
+    r := public.hp_submit_help_offer('Test Rate', 'rate-r21@example.test', '', 'ja', 'ja', 'ja', 'ja', '', '', repeat('c', 32));
+    assert r ->> 'code' = 'RATE', 'Obergrenze nicht gegriffen: ' || r::text;
+    assert not exists (select 1 from public.hp_help_offers where email = 'rate-r21@example.test'), 'Antwort trotz Obergrenze';
+    perform set_config('request.jwt.claims', jsonb_build_object('sub', u_a, 'role', 'authenticated')::text, true);
+    perform set_config('role', 'authenticated', true);
+    begin
+      perform public.hp_admin_list_help_offers();
+      bad := bad || ' helfer-liste';
+    exception when insufficient_privilege then null;
+    end;
+    perform set_config('role', v_owner, true);
+    perform set_config('request.jwt.claims', jsonb_build_object('sub', u_admin, 'role', 'authenticated')::text, true);
+    perform set_config('role', 'authenticated', true);
+    r := public.hp_admin_list_help_offers();
+    assert jsonb_array_length(r) = 1 and r -> 0 ->> 'email' = 'probe-r21@example.test', 'Orga sieht die Antwort nicht: ' || r::text;
+    perform set_config('role', v_owner, true);
+    assert bad = '', 'Abfrage offen:' || bad;
+    raise exception using errcode = 'HPT00';
+  exception
+    when sqlstate 'HPT00' then res := res || jsonb_build_object('t', 'R21', 'ok', true);
+    when assert_failure then res := res || jsonb_build_object('t', 'R21', 'ok', false, 'err', sqlerrm);
+    when others then res := res || jsonb_build_object('t', 'R21', 'ok', false, 'err', sqlerrm);
   end;
 
   raise exception 'HP_TEST_RESULTS %', res::text;

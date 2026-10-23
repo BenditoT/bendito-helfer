@@ -68,3 +68,22 @@ grant execute on function public.hp_admin_revoke_login(uuid) to authenticated;
 -- Nur für die Edge Function hp-login.
 grant execute on function public.hp_login_lookup(text, text) to service_role;
 grant execute on function public.hp_login_bind(uuid, text, uuid) to service_role;
+
+-- Funktionen aus 0007 gibt es beim ersten Durchlauf noch nicht. Läuft diese
+-- Datei später noch einmal, stellt der Block die Rechte wieder her, die der
+-- Entzug oben gerade entfernt hat.
+do $$
+begin
+  if exists (
+    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'hp_submit_help_offer'
+  ) then
+    execute 'grant execute on function public.hp_submit_help_offer(text, text, text, text, text, text, text, text, text, text) to service_role';
+  end if;
+  if exists (
+    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+    where n.nspname = 'public' and p.proname = 'hp_admin_list_help_offers'
+  ) then
+    execute 'grant execute on function public.hp_admin_list_help_offers() to authenticated';
+  end if;
+end $$;

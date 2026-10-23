@@ -176,14 +176,31 @@ test('Migrationen: jede Funktion mit leerem search_path, keine offene Policy', (
 });
 
 test('Edge Function: keine Geheimnisse im Quelltext, keine Codes im Log', () => {
-  const ts = read('supabase/functions/hp-login/index.ts');
-  assert.ok(!/eyJ[A-Za-z0-9_-]{20,}/.test(ts), 'Token im Quelltext');
-  for (const m of ts.matchAll(/console\.(log|error|warn)\(([^)]*)\)/g)) {
-    assert.match(m[2], /^"[^"$]*"$/, 'Log mit Variable: ' + m[0]);
+  for (const file of ['supabase/functions/hp-login/index.ts', 'supabase/functions/hp-offer/index.ts']) {
+    const ts = read(file);
+    assert.ok(!/eyJ[A-Za-z0-9_-]{20,}/.test(ts), file + ': Token im Quelltext');
+    for (const m of ts.matchAll(/console\.(log|error|warn)\(([^)]*)\)/g)) {
+      assert.match(m[2], /^"[^"$]*"$/, file + ': Log mit Variable: ' + m[0]);
+    }
+    assert.match(ts, /Deno\.env\.get\("SUPABASE_SERVICE_ROLE_KEY"\)/);
   }
-  assert.match(ts, /Deno\.env\.get\("SUPABASE_SERVICE_ROLE_KEY"\)/);
-  // Die Funktion ist der Login selbst: ohne JWT-Prüfung des Gateways bereitstellen.
-  assert.match(read('supabase/config.toml'), /\[functions\.hp-login\]\s*\nverify_jwt = false/);
+  const toml = read('supabase/config.toml');
+  assert.match(toml, /\[functions\.hp-login\]\s*\nverify_jwt = false/);
+  assert.match(toml, /\[functions\.hp-offer\]\s*\nverify_jwt = false/);
+});
+
+test('mithilfe.html: gleiche Sperre wie der Helferplan, nur die eigene Abfrage', () => {
+  const html = read('mithilfe.html');
+  const m = html.match(/<meta http-equiv="Content-Security-Policy" content="([^"]+)"/);
+  assert.ok(m, 'CSP fehlt');
+  assert.equal((m[1].match(/connect-src ([^;"]+)/) || [])[1].trim(), (read('index.html').match(/connect-src ([^;"]+)/) || [])[1].trim());
+  assert.ok(!/unsafe-inline|unsafe-eval|\*/.test(m[1]), 'CSP ist aufgeweicht');
+  assert.ok(!/<script(?![^>]*\bsrc=)[^>]*>/.test(html), 'Inline-Skript gefunden');
+  assert.ok(!/\son[a-z]+="/.test(html), 'Inline-Ereignis gefunden');
+  const js = read('mithilfe.js');
+  new Function(js);
+  assert.deepEqual([...js.matchAll(/fetch\(([^,)]+)/g)].map((x) => x[1].trim()), ["CFG.supabaseUrl + '/functions/v1/hp-offer'"]);
+  assert.ok(!/https?:\/\/[a-z0-9]/i.test(js), 'feste Adresse im Formular');
 });
 
 test('app.js: abgelaufenes Token wird einmal erneuert, überholte Abrufe werden verworfen', () => {

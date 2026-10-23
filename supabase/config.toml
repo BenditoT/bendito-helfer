@@ -6,3 +6,7 @@
 # abgewiesen, bevor die Funktion läuft.
 [functions.hp-login]
 verify_jwt = false
+
+# hp-offer ist das offene Formular. Die Datenbank prüft den Inhalt.
+[functions.hp-offer]
+verify_jwt = false

@@ -1,5 +1,9 @@
 # Changelog
 
+## 5.0.2 — 2026-10-23
+
+Mithilfe-Abfrage. Wer mithelfen will, kann sagen, ob er am Donnerstag schon kommt, bis Montag im Kloster bleibt, bei einer Helfer-Pre-Milonga dabei wäre und zum Abschlussessen am Sonntagabend bleibt. Das Formular liegt unter `mithilfe.html`. Die Antworten sieht nur die Orga, unter dem Reiter „Mithilfe“. Gespeichert wird das auf dem eigenen Server, gelöscht zusammen mit den übrigen Helferdaten.
+
 ## 5.0.1 — 2026-10-16
 
 Datenbank auf eigenem Server. Die App spricht `https://db.benditotango.de` an. Der Rückweg zur Supabase-Cloud bleibt bis nach dem Marathon eingerichtet.
