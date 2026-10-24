@@ -1,5 +1,9 @@
 # Changelog
 
+## 5.0.4 — 2026-10-24
+
+Eine offene Seite holt die Fassung ohne Zwischenspeicher. Liegt eine neuere auf dem Server, lädt die Seite selbst neu. Wer gerade tippt, sieht „Neue Fassung da.“ und lädt selbst neu.
+
 ## 5.0.3 — 2026-10-24
 
 Reiter Kuchen für die Orga. Meldungen, die nicht in der Gästeliste stehen, nach einem eigenen Passwort. Dieser Browser merkt sich das Passwort lokal, bis es auf diesem Gerät vergessen wird. Es wird nicht als Cookie bei jedem Aufruf mitgeschickt.

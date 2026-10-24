@@ -1,4 +1,4 @@
-/* Bendito Helferplan 5.0.3
+/* Bendito Helferplan 5.0.4
  *
  * Preact + htm ohne Build-Schritt. Alle Fachdaten liegen in der Datenbank und
  * kommen über hp_state(); geändert wird nur über die hp_-Funktionen. Im Browser
@@ -1694,5 +1694,68 @@
     rootEl.appendChild(p);
     return;
   }
+  // Neue Fassung: config.js ohne Cache vergleichen. Gleicher Stand bleibt.
+  // Eine andere Fassung lädt direkt neu, außer jemand tippt gerade.
+  function freshUrl() {
+    var url = new URL(location.href);
+    url.searchParams.set('_', String(Date.now()));
+    return url.href;
+  }
+  function formBusy() {
+    var active = document.activeElement;
+    if (active && /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName)) return true;
+    var fields = document.querySelectorAll('form input, form textarea, form select');
+    for (var i = 0; i < fields.length; i++) {
+      var field = fields[i];
+      if (field.type === 'radio' || field.type === 'checkbox') { if (field.checked !== field.defaultChecked) return true; }
+      else if (field.value !== field.defaultValue) return true;
+    }
+    return false;
+  }
+  function showUpdateBar() {
+    if (document.querySelector('.update-bar')) return;
+    var bar = document.createElement('div');
+    bar.className = 'update-bar';
+    bar.setAttribute('role', 'status');
+    var text = document.createElement('span');
+    text.textContent = 'Neue Fassung da.';
+    var button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = 'Neu laden';
+    button.addEventListener('click', function () { location.replace(freshUrl()); });
+    bar.appendChild(text);
+    bar.appendChild(button);
+    document.body.appendChild(bar);
+  }
+  function checkUpdate() {
+    fetch('config.js?_=' + Date.now(), {cache: 'no-store'}).then(function (res) {
+      return res.ok ? res.text() : '';
+    }).then(function (text) {
+      var match = /version:\s*'([^']+)'/.exec(text || '');
+      if (!match) return;
+      if (match[1] === CFG.version) {
+        var clean = new URL(location.href);
+        if (clean.searchParams.has('_')) {
+          clean.searchParams.delete('_');
+          history.replaceState(null, '', clean.pathname + clean.search + clean.hash);
+        }
+        return;
+      }
+      var seen = '';
+      try { seen = sessionStorage.getItem('hp-seen-version') || ''; } catch (e) {}
+      if (seen === match[1] || formBusy()) showUpdateBar();
+      else {
+        try { sessionStorage.setItem('hp-seen-version', match[1]); } catch (e) {}
+        location.replace(freshUrl());
+      }
+    }, function () {});
+  }
+  checkUpdate();
+  setInterval(checkUpdate, 120000);
+  window.addEventListener('focus', checkUpdate);
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible') checkUpdate();
+  });
+
   Pr(Ph(App), rootEl);
 })();
