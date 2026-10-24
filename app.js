@@ -1,4 +1,4 @@
-/* Bendito Helferplan 5.0.4
+/* Bendito Helferplan 5.0.5
  *
  * Preact + htm ohne Build-Schritt. Alle Fachdaten liegen in der Datenbank und
  * kommen über hp_state(); geändert wird nur über die hp_-Funktionen. Im Browser
@@ -332,6 +332,18 @@
       <//>`;
   }
 
+  function mailHref(name, url) {
+    var subject = 'Bendito: dein Helferplan';
+    var body = 'Hallo ' + name + ',\n\n'
+      + 'dein persönlicher Link zum Helferplan. Er öffnet deine Schichten. Bitte nicht weiterleiten.\n\n'
+      + url + '\n\n'
+      + '---\n\n'
+      + 'Hello ' + name + ',\n\n'
+      + 'your personal link to the helper plan. It opens your shifts. Please do not forward it.\n\n'
+      + url + '\n\n'
+      + 'Norbert für die Orga';
+    return 'mailto:?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body);
+  }
   function LinkDialog(props) {
     var [copied, setCopied] = useState(false);
     var inpRef = useRef(null);
@@ -347,9 +359,11 @@
     return html`
       <${Dialog} title=${'Login-Link für ' + props.name} onClose=${props.onClose}>
         <p class="dlg-p"><strong>Dieser Link wird nur jetzt angezeigt.</strong> Kopiere ihn und schicke ihn der Person direkt, zum Beispiel per WhatsApp. Nach dem Schließen lässt er sich nicht wieder anzeigen, nur neu erzeugen. Ein neuer Link macht den alten sofort ungültig.</p>
+        <p class="dlg-p">Die App verschickt keine Mail. „Mail vorbereiten“ öffnet dein Mailprogramm. Die Adresse trägst du dort ein.</p>
         <input class="linkbox" type="text" readonly aria-label="Persönlicher Login-Link" value=${props.url} ref=${inpRef} onFocus=${function (e) { e.target.select(); }} />
         <div class="dlg-actions">
           <button type="button" class="btn btn-gold" data-autofocus="1" onClick=${copy}>${copied ? 'Kopiert ✓' : 'Link kopieren'}</button>
+          <a class="btn btn-ghost" href=${mailHref(props.name, props.url)}>Mail vorbereiten</a>
           <button type="button" class="btn btn-ghost" onClick=${props.onClose}>Fertig</button>
         </div>
       <//>`;
@@ -1442,7 +1456,7 @@
           <p class="dlg-p"><strong>Wer es sieht:</strong> Name, Farbe, Kontaktweg, Aufbau-Team und Schichten sehen alle Helfer mit persönlichem Link und die Orga. Tauschanfragen sehen nur die Beteiligten und die Orga.</p>
           <p class="dlg-p"><strong>Technisch dazu:</strong> ein Protokoll ohne Namen, wann welche Aktion lief. Beim Öffnen eines Links wird für etwa einen Tag eine Prüfsumme der Internetadresse gespeichert, um Ausprobieren zu bremsen. Die Adresse selbst wird nicht gespeichert.</p>
           <p class="dlg-p"><strong>Wo es liegt:</strong> auf dem eigenen Server in Nürnberg. Die Seite selbst kommt von GitHub Pages.</p>
-          <p class="dlg-p"><strong>Auf deinem Gerät:</strong> deine Anmeldung, zwei Anzeige-Einstellungen und, sobald die Orga es eingibt, das Passwort für die Kuchen-Meldungen. Keine Statistik, keine Werbung. Dieses Passwort bleibt im Browser und wird nicht bei jedem Seitenaufruf mitgeschickt.</p>
+          <p class="dlg-p"><strong>Auf deinem Gerät:</strong> deine Anmeldung, zwei Anzeige-Einstellungen und, sobald die Orga es eingibt, das Passwort für die Kuchen-Meldungen. Keine Statistik, keine Werbung. Dieses Passwort bleibt im Browser und wird nicht bei jedem Seitenaufruf mitgeschickt. Den Login-Link kann die Orga als Entwurf in ihr eigenes Mailprogramm legen. Die App verschickt diese Mail nicht.</p>
           <p class="dlg-p"><strong>Löschung:</strong> Nach dem Event werden die Login-Links gesperrt und die Helferdaten${until ? ' bis zum ' + until : ''} aus der App gelöscht. Die Orga sichert den Plan vorher als Datei auf ihrem eigenen Gerät.</p>
           <p class="dlg-p">Fragen, Auskunft oder Löschwunsch: bitte direkt an die Orga.</p>
           <div class="dlg-actions"><button type="button" class="btn btn-ghost" data-autofocus="1" onClick=${close}>Schließen</button></div>

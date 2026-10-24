@@ -1,5 +1,9 @@
 # Changelog
 
+## 5.0.5 — 2026-10-24
+
+Beim neuen Login-Link gibt es „Mail vorbereiten“. Das öffnet das eigene Mailprogramm mit dem Link im Text. Die App verschickt die Mail nicht.
+
 ## 5.0.4 — 2026-10-24
 
 Eine offene Seite holt die Fassung ohne Zwischenspeicher. Liegt eine neuere auf dem Server, lädt die Seite selbst neu. Wer gerade tippt, sieht „Neue Fassung da.“ und lädt selbst neu.
