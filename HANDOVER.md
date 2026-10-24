@@ -2,7 +2,7 @@
 
 ## Orga-Login wieder erreichbar (24.10.2026, nachts)
 
-Die Anmeldung kam an, der Planabruf danach nicht. Der Browser schickt dafür die Köpfe `content-profile` und `prefer`. Die Gateway-Freigabe für `/rest/v1/` ließ sie nicht zu, also blieb der eigentliche Aufruf aus. Ergänzt in `lds.template.yaml` auf dem Server, nur die Route `rest-v1-protected`. Sicherung davor: `lds.template.yaml.vor-cors-profil-2026-10-24`. Neu gestartet nur `bendito-envoy`. Danach lässt der Browser den Aufruf durch und bekommt ohne Anmeldung die erwartete Ablehnung. Auth, Datenbank und die übrigen Bendito-Container liefen weiter.
+Die Anmeldung kam an, der Planabruf danach nicht. Der Browser schickt dafür die Köpfe `content-profile` und `prefer`. Die Gateway-Freigabe für `/rest/v1/` ließ sie nicht zu, also blieb der eigentliche Aufruf aus. Ergänzt in `lds.template.yaml` auf dem Server, nur die Route `rest-v1-protected`. Sicherung davor: `lds.template.yaml.vor-cors-profil-2026-10-24`. Neu gestartet nur `bendito-envoy`. Danach lässt der Browser den Aufruf durch und bekommt ohne Anmeldung die erwartete Ablehnung. Auth, Datenbank und die übrigen Bendito-Container liefen weiter. Norbert hat danach bestätigt: der Orga-Login geht.
 
 **Was Norbert jetzt tut:** Ein neues privates Fenster auf [helfer.benditotango.de](https://helfer.benditotango.de/) öffnen und über Orga-Login anmelden. Ein schon offenes Fenster kann die alte Sperre noch bis zu zehn Minuten behalten.
 
