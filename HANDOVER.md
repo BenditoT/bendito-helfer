@@ -1,5 +1,13 @@
 # HANDOVER – Bendito Helferplan
 
+## Mailentwurf für den Login-Link (24.10.2026, 5.0.5)
+
+Die Orga erzeugt den persönlichen Link wie bisher. Daneben öffnet „Mail vorbereiten“ das eigene Mailprogramm. Betreff und Text sind gefüllt, die Adresse nicht, weil die App keine Mailadresse des Helfers speichert. Die App verschickt nichts. Ein neuer Link macht den alten sofort ungültig, auch den in einer schon offenen Mail.
+
+Live: [Helferplan](https://helfer.benditotango.de/) liefert `config.js?v=5.0.5` mit Version 5.0.5. `app.js?v=5.0.5` enthält „Mail vorbereiten“. Beim Abruf kam die neue Datei mit `x-cache: MISS`. Commit `355dc2e` auf `main`. Geprüft: `node --check app.js`. Keine Datenbankänderung. `offline-store.js`, `print.css`, `print.js` und `sw.js` gehören nicht dazu.
+
+**Was Norbert jetzt tut:** Den [Helferplan](https://helfer.benditotango.de/) einmal neu laden. Beim neuen Login-Link steht „Mail vorbereiten“.
+
 ## Neue Fassung kommt von allein (24.10.2026, 5.0.4)
 
 Eine offene Seite holt `config.js` ohne Zwischenspeicher: beim Start, alle zwei Minuten und wenn das Fenster wieder nach vorn kommt. Gleiche Fassung bleibt. Eine neuere lädt über eine frische Adresse, weil GitHub Pages die Dateien etwa zehn Minuten hält. Danach verschwindet der Zusatz in der Adresse, der Anker `#k=` bleibt. Wer gerade tippt, sieht „Neue Fassung da.“ und „Neu laden“. Eine schon offene Fassung 5.0.3 merkt das erst nach einem normalen Laden dieser Ausgabe.
