@@ -1,4 +1,4 @@
-/* Bendito Helferplan 5.0.2
+/* Bendito Helferplan 5.0.3
  *
  * Preact + htm ohne Build-Schritt. Alle Fachdaten liegen in der Datenbank und
  * kommen über hp_state(); geändert wird nur über die hp_-Funktionen. Im Browser
@@ -670,6 +670,10 @@
     var [view, setViewRaw] = useState(prefs.view || 'board');
     var [offers, setOffers] = useState(null);
     var [offersErr, setOffersErr] = useState('');
+    var [teamCakes, setTeamCakes] = useState(null);
+    var [teamErr, setTeamErr] = useState('');
+    var [teamPw, setTeamPw] = useState('');
+    var [teamBusy, setTeamBusy] = useState(false);
     var [day, setDayRaw] = useState(prefs.day || 'fri');
     var [sel, setSel] = useState(null);     // gewählter Helfer zum Zuweisen (Orga)
     var [dd, setDd] = useState(null);       // offene Auswahlliste einer Schicht
@@ -827,6 +831,44 @@
     }
     useEffect(function () {
       if (phase === 'app' && view === 'offers') loadOffers();
+    }, [phase, view]);
+
+    // Die Orga sieht Kuchen, die nicht in der Gästeliste stehen. Das Passwort
+    // bleibt im lokalen Speicher dieses Browsers und geht nicht als Cookie an GitHub.
+    function loadTeamCakes(pw) {
+      setTeamBusy(true);
+      setTeamErr('');
+      return fetch(CFG.supabaseUrl + '/rest/v1/rpc/kb_team', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json', apikey: CFG.supabaseAnonKey, Authorization: 'Bearer ' + CFG.supabaseAnonKey},
+        body: JSON.stringify({p_pass: pw})
+      }).then(function (res) {
+        return res.json().then(function (data) {
+          if (!res.ok) {
+            var msg = data && data.message;
+            if (msg === 'bad_password') {
+              try { localStorage.removeItem('kb-team-pass'); } catch (e) {}
+              setTeamCakes(null);
+              setTeamErr('Das Passwort stimmt nicht.');
+              return;
+            }
+            if (msg === 'rate_limited') { setTeamErr('Zu viele Versuche. Bitte eine Weile warten.'); return; }
+            if (msg === 'closed') { setTeamErr('Die Kuchenliste ist geschlossen.'); return; }
+            setTeamErr('Die Meldungen ließen sich nicht laden.');
+            return;
+          }
+          try { localStorage.setItem('kb-team-pass', pw); } catch (e) {}
+          setTeamPw('');
+          setTeamCakes(Array.isArray(data) ? data : []);
+        }, function () { setTeamErr('Die Meldungen ließen sich nicht laden.'); });
+      }, function () { setTeamErr('Keine Verbindung.'); })
+        .then(function () { setTeamBusy(false); });
+    }
+    useEffect(function () {
+      if (phase !== 'app' || view !== 'cakes') return;
+      var saved = '';
+      try { saved = localStorage.getItem('kb-team-pass') || ''; } catch (e) {}
+      if (saved) loadTeamCakes(saved);
     }, [phase, view]);
 
     // Führt eine ändernde Funktion aus, zeigt das Ergebnis und lädt den Plan neu.
@@ -1400,7 +1442,7 @@
           <p class="dlg-p"><strong>Wer es sieht:</strong> Name, Farbe, Kontaktweg, Aufbau-Team und Schichten sehen alle Helfer mit persönlichem Link und die Orga. Tauschanfragen sehen nur die Beteiligten und die Orga.</p>
           <p class="dlg-p"><strong>Technisch dazu:</strong> ein Protokoll ohne Namen, wann welche Aktion lief. Beim Öffnen eines Links wird für etwa einen Tag eine Prüfsumme der Internetadresse gespeichert, um Ausprobieren zu bremsen. Die Adresse selbst wird nicht gespeichert.</p>
           <p class="dlg-p"><strong>Wo es liegt:</strong> auf dem eigenen Server in Nürnberg. Die Seite selbst kommt von GitHub Pages.</p>
-          <p class="dlg-p"><strong>Auf deinem Gerät:</strong> nur deine Anmeldung und zwei Anzeige-Einstellungen. Keine Statistik, keine Werbung.</p>
+          <p class="dlg-p"><strong>Auf deinem Gerät:</strong> deine Anmeldung, zwei Anzeige-Einstellungen und, sobald die Orga es eingibt, das Passwort für die Kuchen-Meldungen. Keine Statistik, keine Werbung. Dieses Passwort bleibt im Browser und wird nicht bei jedem Seitenaufruf mitgeschickt.</p>
           <p class="dlg-p"><strong>Löschung:</strong> Nach dem Event werden die Login-Links gesperrt und die Helferdaten${until ? ' bis zum ' + until : ''} aus der App gelöscht. Die Orga sichert den Plan vorher als Datei auf ihrem eigenen Gerät.</p>
           <p class="dlg-p">Fragen, Auskunft oder Löschwunsch: bitte direkt an die Orga.</p>
           <div class="dlg-actions"><button type="button" class="btn btn-ghost" data-autofocus="1" onClick=${close}>Schließen</button></div>
@@ -1454,6 +1496,62 @@
       return null;
     }
 
+    function renderCakes() {
+      var labels = {vegan: 'vegan', glutenfrei: 'glutenfrei', laktosefrei: 'laktosefrei', nuesse: 'enthält Nüsse', alkohol: 'enthält Alkohol'};
+      var saved = '';
+      try { saved = localStorage.getItem('kb-team-pass') || ''; } catch (e) {}
+      function notes(c) {
+        var bits = [c.kind === 'herzhaft' ? 'Herzhaft' : 'Süß'];
+        (c.labels || []).forEach(function (key) { if (labels[key]) bits.push(labels[key]); });
+        if (c.cooling) bits.push('Kühlschrank');
+        if (c.pieces) bits.push('ca. ' + c.pieces + ' Stücke');
+        return bits.join(' · ');
+      }
+      var groups = [];
+      var bySlot = {};
+      (teamCakes || []).forEach(function (c) {
+        var title = c.slot_label || 'Termin';
+        if (!bySlot[title]) { bySlot[title] = []; groups.push(title); }
+        bySlot[title].push(c);
+      });
+      return html`<div class="offers">
+        <h2>Kuchen nur fürs Team</h2>
+        <p class="s-note">Das sind die Meldungen, die nicht in der Gästeliste stehen. Das Passwort bleibt auf diesem Gerät, bis du es hier vergisst.</p>
+        ${saved ? html`<div class="btn-row">
+          <button type="button" class="btn btn-gold" disabled=${teamBusy} onClick=${function () { loadTeamCakes(saved); }}>Neu laden</button>
+          <button type="button" class="btn btn-ghost" onClick=${function () {
+            try { localStorage.removeItem('kb-team-pass'); } catch (e) {}
+            setTeamCakes(null); setTeamErr(''); setTeamPw('');
+          }}>Passwort auf diesem Gerät vergessen</button>
+        </div>` : html`<form onSubmit=${function (e) {
+          e.preventDefault();
+          if (!teamBusy && teamPw) loadTeamCakes(teamPw);
+        }}>
+          <div class="field">
+            <label for="kb-team-pw">Passwort</label>
+            <input id="kb-team-pw" type="password" autocomplete="off" value=${teamPw} onInput=${function (e) { setTeamPw(e.target.value); }} />
+          </div>
+          <button type="submit" class="btn btn-gold" disabled=${teamBusy || !teamPw}>Anzeigen</button>
+        </form>`}
+        ${teamErr ? html`<p class="empty-msg" role="alert">${teamErr}</p>` : null}
+        ${teamBusy && !teamCakes ? html`<p class="empty-msg">Wird geladen …</p>` : null}
+        ${teamCakes && teamCakes.length === 0 ? html`<p class="empty-msg">Noch keine Meldung nur ans Team.</p>` : null}
+        ${groups.map(function (title) {
+          return html`<section key=${title}>
+            <h3>${title}</h3>
+            ${bySlot[title].map(function (c) {
+              return html`<article class="offer-card" key=${c.id}>
+                <h3>${c.cake}</h3>
+                <div class="mini-sub">${c.name} · ${notes(c)}</div>
+                <p>${c.dropoff || ''}</p>
+                ${c.note ? html`<p>${c.note}</p>` : null}
+              </article>`;
+            })}
+          </section>`;
+        })}
+      </div>`;
+    }
+
     function renderOffers() {
       var rows = offers || [];
       var choice = {ja: 'Ja', nein: 'Nein', vielleicht: 'Mal sehen'};
@@ -1495,7 +1593,7 @@
     var tabs = [['board', 'Board', 0]];
     if (isHelper) tabs.push(['myplan', 'Mein Plan', 0]);
     tabs.push(['helpers', 'Helfer', 0], ['howto', 'Anleitungen', 0]);
-    if (isAdmin) tabs.push(['offers', 'Mithilfe', offers ? offers.length : 0], ['swaps', 'Tausch', d.pendingMoves.length], ['settings', 'Einstellungen', 0]);
+    if (isAdmin) tabs.push(['cakes', 'Kuchen', teamCakes ? teamCakes.length : 0], ['offers', 'Mithilfe', offers ? offers.length : 0], ['swaps', 'Tausch', d.pendingMoves.length], ['settings', 'Einstellungen', 0]);
     if (isHelper) tabs.push(['myswaps', 'Mein Tausch', d.incoming.length], ['inbox', 'Hinweise', d.unread]);
     var known = tabs.some(function (t) { return t[0] === view; }) || (view === 'print' && isAdmin);
     var cur = known ? view : 'board';
@@ -1505,6 +1603,7 @@
     else if (cur === 'myplan') body = renderMyPlan();
     else if (cur === 'helpers') body = renderHelpers();
     else if (cur === 'howto') body = renderHowto();
+    else if (cur === 'cakes') body = renderCakes();
     else if (cur === 'offers') body = renderOffers();
     else if (cur === 'swaps') body = renderAdminSwaps();
     else if (cur === 'settings') body = renderSettings();

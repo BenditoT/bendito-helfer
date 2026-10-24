@@ -1,5 +1,9 @@
 # Changelog
 
+## 5.0.3 — 2026-10-24
+
+Reiter Kuchen für die Orga. Meldungen, die nicht in der Gästeliste stehen, nach einem eigenen Passwort. Dieser Browser merkt sich das Passwort lokal, bis es auf diesem Gerät vergessen wird. Es wird nicht als Cookie bei jedem Aufruf mitgeschickt.
+
 ## 5.0.2 — 2026-10-23
 
 Mithilfe-Abfrage. Wer mithelfen will, kann sagen, ob er am Donnerstag schon kommt, bis Montag im Kloster bleibt, bei einer Helfer-Pre-Milonga dabei wäre und zum Abschlussessen am Sonntagabend bleibt. Das Formular liegt unter `mithilfe.html`. Die Antworten sieht nur die Orga, unter dem Reiter „Mithilfe“. Gespeichert wird das auf dem eigenen Server, gelöscht zusammen mit den übrigen Helferdaten.
