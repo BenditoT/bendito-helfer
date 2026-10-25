@@ -1,3 +1,15 @@
+**25.10.2026 — Sonnet 5.1.0: S7 mit allen fünf Fällen bestanden.** Mailfelder und Schalter mit zwei Testhelfern geprüft; Eingabefelder nach Speichern leer, `hp_state` ohne Adresse. Tatsächlicher Posteingang von Anfrage/Annahme 14:28:12 und Ablehnung/Zuweisung 17:10:12 CET, jeweils Originalkopf geprüft. Opt-out verhindert neue Outbox-Zeilen bei Entfernung und weiterer Anfrage. Lokale Oberfläche mit Testadapter gegen unveränderte Live-Funktionen; normale Anmeldung und HTTP-Datenzugang nicht erneut geprüft. Testversand 17:11:34 beendet, null Trigger; Testhelfer, Testschichten, synthetische Testkonten, Adressen und Outbox vollständig entfernt. 8 echte Helfer und 42 Zuweisungen; beim Aufräumen per Prüfsumme unverändert. 29 lokale Prüfungen und Veröffentlichungsschranke grün. Regulärer Versand aus. S8/S9 warten auf CSV und ausdrückliche Versandfreigabe; keine Einladungsentwürfe geändert. Bericht: `docs/TESTLAUF-5.1.0.md`. Vorhandene unversionierte Offline-/Druckdateien unangetastet.
+
+**Was Norbert jetzt tut:** Die Helfer-CSV für den regulären Versand freigeben und ihren Dateipfad nennen.
+
+---
+
+**25.10.2026 — Sonnet-Mail-Sprint: 5.1.0 lokal vorbereitet, S7 offen.** Orga-Mailfelder (Adresse nach Absenden geleert, nur Hinterlegungsstatus sichtbar), eigener Mail-Schalter, Hinweise für assigned/unassigned, Datenschutz und Texte umgesetzt. S1/S2 noch nicht mit angemeldeten Testhelfern abgenommen. 18 statische und 11 Poller-/Importprüfungen mit Node 22 grün; Veröffentlichungsschranke grün. System-Node 18 stürzt beim Teststart ab. Keine Backend-/Apps-Script-Änderung, kein Push, kein Adressimport, keine Entwurfsänderung, keine Mail gesendet. S7 benötigt zwei ausdrücklich bestätigte eigene Testempfänger; im Chat angefragt. Versand nicht eingeschaltet. Vor Veröffentlichung alle fünf Fälle mit Empfangszeiten und anschließendem Aufräumen nachweisen. S8/S9 erst danach und mit Versandfreigabe; CSV noch nicht vorhanden. Bericht: `bendito-helfer-app/docs/TESTLAUF-5.1.0.md`. Bereits vorhandene unversionierte Offline-/Druckdateien unangetastet.
+
+**Was Norbert jetzt tut:** Zwei eigene Mailadressen für den vollständigen Testlauf bestätigen.
+
+---
+
 **25.10.2026 — Version 5.0.7 veröffentlicht.** Norbert hat Codex ausdrücklich zum selbstständigen Push ermächtigt. Commit `1edc156` auf origin/main gepusht, Live-Seite zeigt 5.0.7, „← Zur Bendito-App“ live angeklickt und korrekt zur Gäste-App navigiert. 28 Prüfungen und Veröffentlichungsschranke grün. Mailversand bleibt ausgeschaltet.
 
 **Was Norbert jetzt tut:** Den Rückweg zur Bendito-App in der veröffentlichten Helfer-App ausprobieren.

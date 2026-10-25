@@ -1,4 +1,4 @@
-/* Bendito Helferplan 5.0.7
+/* Bendito Helferplan 5.1.0
  *
  * Preact + htm ohne Build-Schritt. Alle Fachdaten liegen in der Datenbank und
  * kommen über hp_state(); geändert wird nur über die hp_-Funktionen. Im Browser
@@ -477,6 +477,57 @@
         </div>
         ${msg ? html`<div class=${'notice ' + (msg.ok ? 'info' : 'err')} role="status" style=${{margin: '8px 0 0'}}><span>${msg.text}</span></div>` : null}
       </form>`;
+  }
+
+  // Private addresses are write-only and never kept in the plan or browser storage.
+  function HelperMail(props) {
+    var [status, setStatus] = useState(null);
+    var [failed, setFailed] = useState(false);
+    var input = useRef(null);
+    useEffect(function () {
+      var active = true;
+      rpc('hp_admin_helper_mail_list').then(function (rows) {
+        if (active) setStatus(rows.filter(function (x) { return x.helper_id === props.id; })[0] || {has_mail: false});
+      }, function () { if (active) setFailed(true); });
+      return function () { active = false; };
+    }, [props.id]);
+    function save(e) {
+      e.preventDefault();
+      var address = input.current.value.trim();
+      input.current.value = '';
+      props.act('hp_admin_set_helper_mail', {p_helper: props.id, p_email: address}, {
+        okText: address ? 'Mail hinterlegt.' : 'Mail entfernt.',
+        onOk: function () { setStatus({has_mail: !!address}); setFailed(false); }
+      });
+    }
+    return html`<form class="s-row" onSubmit=${save}>
+      <div class="field"><label for=${'mail-' + props.id}>Mail für Benachrichtigungen</label>
+        <input ref=${input} id=${'mail-' + props.id} type="email" autocomplete="off" disabled=${props.disabled} />
+        <span class="mini-sub">${failed ? 'Mailstatus nicht geladen' : status ? (status.has_mail ? 'Mail hinterlegt' : 'keine Mail') : 'Mailstatus wird geladen…'}</span>
+      </div>
+      <button class="btn btn-ghost btn-sm" type="submit" disabled=${props.disabled}>Speichern</button>
+      <span class="mini-sub">Leer speichern entfernt die Mail.</span>
+    </form>`;
+  }
+
+  function MyMail(props) {
+    var [status, setStatus] = useState(null);
+    var [failed, setFailed] = useState(false);
+    useEffect(function () {
+      var active = true;
+      rpc('hp_my_mail_enabled', {p_on: null}).then(function (r) {
+        if (active && r.ok) setStatus(r);
+      }, function () { if (active) setFailed(true); });
+      return function () { active = false; };
+    }, []);
+    if (!status) return html`<p class="s-note">${failed ? 'Deine Mail-Einstellung konnte nicht geladen werden.' : 'Mail-Einstellung wird geladen…'}</p>`;
+    return html`<div class="s-note">
+      <label class="check"><input type="checkbox" checked=${status.enabled} disabled=${props.disabled || !status.has_mail}
+        onChange=${function (e) {
+          props.act('hp_my_mail_enabled', {p_on: e.target.checked}, {onOk: setStatus});
+        }} /> Mail bei Tausch und Änderungen</label>
+      <p>${!status.has_mail ? 'Für dich ist noch keine Mail hinterlegt. Bitte melde dich bei der Orga.' : status.enabled ? 'Bei Tauschanfragen bekommst du zusätzlich eine Mail.' : 'Die Mails sind ausgeschaltet. Hinweise findest du weiter hier in der App.'}</p>
+    </div>`;
   }
 
   function SettingsForms(props) {
@@ -964,8 +1015,7 @@
       if (sel) assign(shiftId, sel, false);
       else setDd(dd === shiftId ? null : shiftId);
     }
-    // Die App meldet Helfern nicht, wenn die Orga etwas ändert. Deshalb erinnert die
-    // Rückmeldung daran, und vor dem Entfernen wird gewarnt, wenn ein Tausch daran hängt.
+    // Vor dem Entfernen warnen, wenn eine offene Tauschanfrage an der Zuweisung hängt.
     function unassign(shiftId, helperId) {
       var who = nameOf(d, helperId), where = shiftText(d, shiftId);
       var touched = d.pending.filter(function (w) {
@@ -974,7 +1024,7 @@
       var go = function () {
         setDlg(null);
         act('hp_admin_unassign', {p_shift: shiftId, p_helper: helperId}, {
-          okText: who + ' ist aus ' + where + ' entfernt. Sag der Person kurz Bescheid: Änderungen durch die Orga meldet die App nicht.'
+          okText: who + ' ist aus ' + where + ' entfernt. Die Änderung steht im Posteingang der Person.'
         });
       };
       if (touched.length) {
@@ -984,12 +1034,11 @@
     }
     function requestSwap(fromId, toId, note) {
       setDlg(null);
-      var others = (d.byShift[toId] || []).filter(function (id) { return id !== me; }).map(function (id) { return nameOf(d, id); }).join(' oder ');
       act('hp_swap_request', {p_from_shift: fromId, p_to_shift: toId, p_note: note}, {
         okText: function (r) {
           return r.kind === 'move'
-            ? 'Anfrage gesendet. Die Orga gibt den Wechsel frei. Sag der Orga kurz Bescheid, die App schickt keine Nachricht aufs Telefon.'
-            : 'Anfrage gesendet. Sag ' + (others || 'der Person') + ' kurz Bescheid, die App schickt keine Nachricht aufs Telefon. Die Antwort siehst du unter „Mein Tausch“.';
+            ? 'Anfrage gesendet. Die Orga gibt den Wechsel frei. Die Antwort siehst du unter „Mein Tausch“.'
+            : 'Anfrage gesendet. Die Antwort siehst du unter „Mein Tausch“.';
         }
       });
     }
@@ -1162,6 +1211,7 @@
       return html`
         <div class="my-plan">
           <h2>Mein Helferplan</h2>
+          <${MyMail} key=${me} act=${act} disabled=${off} />
           <div class="me-box">
             <div class="me-av" style=${{backgroundColor: h.color}}></div>
             <div>
@@ -1260,6 +1310,8 @@
 
     // ----- Hinweise -----
     function noteText(n) {
+      if (n.kind === 'assigned') return {head: 'Schicht zugewiesen', body: 'Die Orga hat dir diese Schicht zugewiesen: ' + shiftText(d, n.shift_id) + '.'};
+      if (n.kind === 'unassigned') return {head: 'Schicht entfernt', body: 'Die Orga hat dich aus dieser Schicht entfernt: ' + shiftText(d, n.shift_id) + '.'};
       var w = d.swById[n.swap_id];
       if (!w) return {head: 'Tausch', body: 'Der zugehörige Vorgang ist nicht mehr vorhanden.'};
       var line = shiftText(d, w.from_shift) + ' gegen ' + shiftText(d, w.to_shift);
@@ -1276,6 +1328,7 @@
       return html`
         <div class="inbox">
           <h2>Hinweise</h2>
+          <${MyMail} key=${me} act=${act} disabled=${off} />
           ${d.notifications.length === 0 ? html`<p class="empty-msg">Keine Hinweise. Hier erscheinen Rückmeldungen zu deinen Tauschanfragen.</p>` : null}
           <div>${d.notifications.map(function (n) {
             var t = noteText(n);
@@ -1351,6 +1404,7 @@
                   ${h.active ? null : html`<span class="tag off">deaktiviert</span>`}
                   <span class="mini-sub">${s.c} Schichten · ${hrs(s.min)} h · ${h.contact_channel || 'kein Kontaktweg'} · ${login}</span>
                 </div>
+                <${HelperMail} id=${h.id} act=${act} disabled=${off} />
                 ${h.active ? html`<div class="mini-acts" key="on">
                     <button type="button" class="btn btn-ghost btn-sm" disabled=${off} onClick=${function () { setDlg({type: 'edit', helper: h}); }}>Bearbeiten</button>
                     <button type="button" class="btn btn-gold btn-sm" disabled=${off} onClick=${function () { newLink(h); }}>${h.has_login ? 'Login-Link erneuern' : 'Login-Link erzeugen'}</button>
@@ -1456,6 +1510,7 @@
         var until = fmtDay(d.settings.purge_after);
         return html`<${Dialog} title="Datenschutz" onClose=${close}>
           <p class="dlg-p"><strong>Was gespeichert wird:</strong> dein Anzeigename, eine Farbe, dein bevorzugter Kontaktweg (ohne Nummer oder Adresse), ob du zum Aufbau-Team gehörst, deine Schichten und deine Tauschanfragen samt Notiz. Wer das Formular „Mithilfe anbieten“ ausfüllt, speichert zusätzlich Name, E-Mail, Telefon, die Antworten zu Donnerstag, Montag, Pre-Milonga und Abschlussessen sowie eine Anmerkung. Diese Antworten sieht nur die Orga.</p>
+          <p class="dlg-p">Deine Mailadresse speichern wir nur für Benachrichtigungen zu Tausch und Schichtänderungen. Die Mails kommen über das Bendito-Gmail. Du kannst sie unter „Mein Plan“ jederzeit abschalten. Deine Mailadresse löschen wir spätestens am 15.11.2026.</p>
           <p class="dlg-p"><strong>Wer es sieht:</strong> Name, Farbe, Kontaktweg, Aufbau-Team und Schichten sehen alle Helfer mit persönlichem Link und die Orga. Tauschanfragen sehen nur die Beteiligten und die Orga.</p>
           <p class="dlg-p"><strong>Technisch dazu:</strong> ein Protokoll ohne Namen, wann welche Aktion lief. Beim Öffnen eines Links wird für etwa einen Tag eine Prüfsumme der Internetadresse gespeichert, um Ausprobieren zu bremsen. Die Adresse selbst wird nicht gespeichert.</p>
           <p class="dlg-p"><strong>Wo es liegt:</strong> auf dem eigenen Server in Nürnberg. Die Seite selbst kommt von GitHub Pages.</p>

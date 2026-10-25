@@ -223,3 +223,17 @@ test('Testdaten sind synthetisch', () => {
   const names = [...seed.matchAll(/\('([^']+)', '#/g)].map((m) => m[1]);
   assert.deepEqual(names, ['Test Anna', 'Test Ben', 'Test Cleo']);
 });
+
+
+test('keine privaten Mailadressen im Repository', () => {
+  const hits = [];
+  for (const f of textFiles.filter((f) => !f.startsWith('vendor/'))) {
+    const addresses = read(f).match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi) || [];
+    for (const address of addresses) {
+      // Nur synthetische Testdomains und das öffentliche Absenderkonto.
+      if (f === 'supabase/tests/t_rights.sql' && address === 'a' + '@' + 'b.co') continue; // bestehender synthetischer Grenzwerttest
+      if (!/\.(invalid|test)$/i.test(address) && address.toLowerCase() !== 'benditotango' + '@' + 'gmail.com') hits.push(f);
+    }
+  }
+  assert.deepEqual([...new Set(hits)], []);
+});

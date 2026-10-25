@@ -1,5 +1,12 @@
 # Changelog
 
+## 5.1.0 — 2026-10-25
+
+- Orga kann Benachrichtigungsadressen hinterlegen und entfernen; sichtbar bleibt nur der Hinterlegungsstatus.
+- Helfer können Mails zu Tausch und Änderungen unter „Mein Plan“ und „Hinweise“ abschalten.
+- Zuweisung und Entfernung durch die Orga erscheinen als verständliche Hinweise.
+- Datenschutz und Hilfetexte ergänzt. Alle fünf Mail-Testfälle bestanden; regulärer Versand bis zur Freigabe ausgeschaltet.
+
 ## 5.0.7 — 2026-10-25
 
 „Zur Bendito-App“ führt aus allen Planansichten, der Anmeldung und Verbindungsmeldungen zurück zur Gäste-App. Der Link öffnet sich im selben Tab; die Helfer-Anmeldung bleibt erhalten.

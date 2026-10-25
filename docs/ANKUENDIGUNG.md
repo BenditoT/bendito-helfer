@@ -7,7 +7,7 @@ Fertige Texte zum Verschicken. Vier Platzhalter ersetzen:
 - `{LINK}`: der persönliche Login-Link der Person (in der App unter „Einstellungen“ → „Login-Link erzeugen“). Jede Person bekommt ihren eigenen. Nie in eine Gruppe stellen.
 - `{DATUM}`: der Tag, ab dem der Plan gilt (geplant: Mo 19.10.2026).
 
-Verschickt wird einzeln, zum Beispiel per WhatsApp. Die App selbst versendet nichts.
+Verschickt wird einzeln, zum Beispiel per WhatsApp. Die Einladung verschickst du selbst. Automatische Hinweise zu Tausch und Änderungen erst nach bestandenem Mail-Testlauf zusagen.
 
 **Erst verschicken, wenn** der Durchgang auf der veröffentlichten Seite grün ist (`docs/TESTLAUF-5.0.0.md`), die echten Helfer angelegt und die Schichten zugewiesen sind.
 
@@ -65,3 +65,9 @@ Die App meldet Helfern nicht, wenn die Orga eine Schicht zuweist oder entfernt. 
 
 > Hier ist dein persönlicher Link zum Bendito-Helferplan: {LINK}
 > Antippen, dann siehst du deine Schichten. Bitte nicht weitergeben.
+
+## Datenschutz zu Benachrichtigungen
+
+Deine Mailadresse speichern wir nur für Benachrichtigungen zu Tausch und Schichtänderungen. Die Mails kommen über das Bendito-Gmail. Unter „Mein Plan“ kannst du sie jederzeit abschalten. Deine Mailadresse löschen wir spätestens am 15.11.2026.
+
+Den zusätzlichen Einladungssatz erst nach bestandenem Testlauf 5.1.0 und Versandfreigabe verwenden.
