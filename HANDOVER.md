@@ -1,6 +1,12 @@
+**25.10.2026 — Version 5.0.7 veröffentlicht.** Norbert hat Codex ausdrücklich zum selbstständigen Push ermächtigt. Commit `1edc156` auf origin/main gepusht, Live-Seite zeigt 5.0.7, „← Zur Bendito-App“ live angeklickt und korrekt zur Gäste-App navigiert. 28 Prüfungen und Veröffentlichungsschranke grün. Mailversand bleibt ausgeschaltet.
+
+**Was Norbert jetzt tut:** Den Rückweg zur Bendito-App in der veröffentlichten Helfer-App ausprobieren.
+
+---
+
 **25.10.2026 — Opus-Mail-Sprint abgeschlossen; Rückweg zur Bendito-App (5.0.7) vorbereitet.** Datenbank nach Sicherung 20261025-1313 live installiert und geprüft. O6 bestanden: tatsächliche Tauschanfrage 13:44:37, automatischer Versand und Received-Header 13:45:43 CET, tatsächlicher Eingang im separaten eigenen Postfach geprüft — rund 66 Sekunden. Insgesamt zwei ausdrücklich autorisierte Testmails nur an Norberts eigene Empfänger; erster Versuch über Rückleitung ins Senderkonto war nicht eindeutig. Danach Versand aus, Triggerübersicht 0, Testhelfer samt Adressen/Outbox entfernt; 8 echte Helfer und Zuweisungen unverändert. Die normale Helferbenachrichtigung bleibt bis zur Sonnet-Abnahme und ausdrücklichen Versandfreigabe aus. Version 5.0.7 ergänzt „← Zur Bendito-App“ in Kopfzeile, Login und Verbindungsmeldungen; echter Klick, erhaltene Anmeldung und Handyansicht geprüft. 28 lokale Prüfungen und Veröffentlichungsschranke grün. Noch kein Push; Veröffentlichung laut Projektvorgabe durch Norbert. [Testbericht](docs/TESTLAUF-MAIL-BACKEND-2026-10-25.md).
 
-**Was Norbert jetzt tut:** Im Ordner bendito-helfer-app den vorbereiteten Stand mit git push origin main veröffentlichen.
+**Was Norbert jetzt tut:** Den Rückweg zur Bendito-App in der veröffentlichten Helfer-App ausprobieren.
 
 ---
 

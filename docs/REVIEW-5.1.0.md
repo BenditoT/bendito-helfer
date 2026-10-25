@@ -1,6 +1,6 @@
 # Sicherheitsreview Mail-Benachrichtigung — 25.10.2026
 
-Status: Backend installiert, Versand nicht aktiviert. O6 (realer Gmail-Empfang innerhalb von drei Minuten) bestanden; weiterhin kein Go für echte Empfänger oder Mailzusagen ohne Sonnet-Abnahme und Versandfreigabe. Kein Web-App-Deployment durchgeführt.
+Status: Backend installiert, Versand nicht aktiviert. O6 (realer Gmail-Empfang innerhalb von drei Minuten) bestanden; weiterhin kein Go für echte Empfänger oder Mailzusagen ohne Sonnet-Abnahme und Versandfreigabe. Die zusätzliche Rücknavigation ist als Web-App 5.0.7 veröffentlicht; die Mail-Oberfläche 5.1.0 steht weiterhin aus.
 
 ## Wer kann was?
 

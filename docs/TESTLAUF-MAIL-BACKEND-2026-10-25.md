@@ -31,6 +31,6 @@ Kein Empfangs-Header mit Adresse oder Message-ID im Repo gespeichert. Die tempor
 
 „← Zur Bendito-App“ ist in der Kopfzeile aller angemeldeten Ansichten sowie auf Anmeldung und Verbindungs-/Ladeseiten vorhanden. Der Link führt im selben Tab auf die Gäste-App. Ein tatsächlicher Klick mit einem Testhelfer erreichte die Bendito-App; der Browser-Rückweg zeigte die weiter angemeldete Helferansicht. Bei 360 Pixeln Bildschirmbreite kein Überlauf; der Link ist 44 Pixel hoch. Testhelfer anschließend vollständig entfernt.
 
-17 statische Prüfungen und 11 Poller-/Import-/Teststeuerungsprüfungen bestanden, Veröffentlichungsschranke grün. Version 5.0.7 ist lokal vorbereitet; Veröffentlichung der Web-App erfolgt gemäß Projektvorgabe durch Norbert.
+17 statische Prüfungen und 11 Poller-/Import-/Teststeuerungsprüfungen bestanden, Veröffentlichungsschranke grün. Norbert hat Codex am 25.10.2026 ausdrücklich zum selbstständigen Push ermächtigt. Version 5.0.7 (Commit 1edc156) ist veröffentlicht; Versionsanzeige und tatsächlicher Klick zur Gäste-App auf der Live-Seite geprüft.
 
 Quelle zum Alias-Sonderfall: [Google-Hilfe: Messages sent to email alias or Group aren't in my inbox](https://knowledge.workspace.google.com/admin/support/troubleshooting/messages-sent-to-email-alias-or-group-arent-in-my-inbox). Die STRATO-Weiterleitung wurde nicht geändert.
