@@ -1,3 +1,9 @@
+**25.10.2026 — Version 5.1.0 veröffentlicht.** Funktionsstand `3205629` nach grüner Veröffentlichungsschranke auf origin/main gepusht. GitHub-Pages-Deployment erfolgreich; Live-Konfiguration, HTML und tatsächliche Versionsanzeige im Browser zeigen 5.1.0. S7 bestanden, Testdaten entfernt, regulärer Versand ausgeschaltet. S8/S9 warten auf Helfer-CSV und ausdrückliche Versandfreigabe.
+
+**Was Norbert jetzt tut:** Die Helfer-CSV für den regulären Versand freigeben und ihren Dateipfad nennen.
+
+---
+
 **25.10.2026 — Sonnet 5.1.0: S7 mit allen fünf Fällen bestanden.** Mailfelder und Schalter mit zwei Testhelfern geprüft; Eingabefelder nach Speichern leer, `hp_state` ohne Adresse. Tatsächlicher Posteingang von Anfrage/Annahme 14:28:12 und Ablehnung/Zuweisung 17:10:12 CET, jeweils Originalkopf geprüft. Opt-out verhindert neue Outbox-Zeilen bei Entfernung und weiterer Anfrage. Lokale Oberfläche mit Testadapter gegen unveränderte Live-Funktionen; normale Anmeldung und HTTP-Datenzugang nicht erneut geprüft. Testversand 17:11:34 beendet, null Trigger; Testhelfer, Testschichten, synthetische Testkonten, Adressen und Outbox vollständig entfernt. 8 echte Helfer und 42 Zuweisungen; beim Aufräumen per Prüfsumme unverändert. 29 lokale Prüfungen und Veröffentlichungsschranke grün. Regulärer Versand aus. S8/S9 warten auf CSV und ausdrückliche Versandfreigabe; keine Einladungsentwürfe geändert. Bericht: `docs/TESTLAUF-5.1.0.md`. Vorhandene unversionierte Offline-/Druckdateien unangetastet.
 
 **Was Norbert jetzt tut:** Die Helfer-CSV für den regulären Versand freigeben und ihren Dateipfad nennen.
