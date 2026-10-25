@@ -31,7 +31,9 @@ declare
     'hp_admin_upsert_helper(uuid,text,text,text,boolean,integer,boolean)', 'hp_admin_add_helpers(text[],boolean)',
     'hp_admin_deactivate_helper(uuid,boolean)', 'hp_admin_reactivate_helper(uuid)',
     'hp_admin_set_setting(text,jsonb)', 'hp_admin_remove_test_data()', 'hp_admin_purge(text)',
-    'hp_admin_new_login_code(uuid)', 'hp_admin_revoke_login(uuid)', 'hp_admin_list_help_offers()'];
+    'hp_admin_new_login_code(uuid)', 'hp_admin_revoke_login(uuid)', 'hp_admin_list_help_offers()',
+    'hp_admin_set_helper_mail(uuid,text)', 'hp_admin_helper_mail_list()',
+    'hp_my_mail_enabled(boolean)', 'hp_admin_set_mail_secret_hash(text)'];
   res jsonb := '[]'::jsonb;
   r jsonb;
   r2 jsonb;
@@ -126,15 +128,15 @@ begin
     when others then res := res || jsonb_build_object('t', 'R1', 'ok', false, 'err', sqlerrm);
   end;
 
-  -- ------------------------------------------------------------ R2: anon kann keine Funktion ausführen
+  -- ------------------------------------------------------------ R2: anon darf nur die beiden geheimnisgeschützten Mail-RPCs ausführen
   begin
     bad := '';
     for f in
-      select p.oid, p.oid::regprocedure::text as sig
+      select p.oid, p.proname, p.oid::regprocedure::text as sig
       from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
       where (ns.nspname = 'public' and p.proname like 'hp\_%') or ns.nspname = 'hp_private'
     loop
-      if has_function_privilege('anon', f.oid, 'execute') then bad := bad || ' ' || f.sig; end if;
+      if f.proname not in ('hp_mail_claim','hp_mail_done') and has_function_privilege('anon', f.oid, 'execute') then bad := bad || ' ' || f.sig; end if;
     end loop;
     assert bad = '', 'anon darf ausführen:' || bad;
     assert not has_schema_privilege('anon', 'hp_private', 'usage'), 'anon darf das interne Schema nutzen';

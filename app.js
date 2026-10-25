@@ -1,4 +1,4 @@
-/* Bendito Helferplan 5.0.6
+/* Bendito Helferplan 5.0.7
  *
  * Preact + htm ohne Build-Schritt. Alle Fachdaten liegen in der Datenbank und
  * kommen über hp_state(); geändert wird nur über die hp_-Funktionen. Im Browser
@@ -18,6 +18,7 @@
   var POLL_MS = 20000;
   var RPC_TIMEOUT_MS = 8000;
   var LOGO = 'assets/logo.png';
+  var BENDITO_APP = CFG.benditoAppUrl;
 
   // ===== Feste Texte. Nur diese Konstanten gelangen in dangerouslySetInnerHTML. =====
   var ST = {
@@ -428,6 +429,7 @@
             </form>
             <button type="button" class="login-link" onClick=${function () { setMode('helper'); setErr(''); }}>Zurück</button>
           </div>`}
+          <a class="login-link" href=${BENDITO_APP} referrerpolicy="no-referrer">← Zur Bendito-App</a>
           <div class="login-ver">Version ${VERSION}</div>
         </div>
       </main>`;
@@ -441,6 +443,7 @@
           <h1>Helferplan</h1>
           <p role="status">${props.text}</p>
           ${props.onRetry ? html`<button type="button" class="btn btn-gold" onClick=${props.onRetry}>Erneut versuchen</button>` : null}
+          <a class="login-link" href=${BENDITO_APP} referrerpolicy="no-referrer">← Zur Bendito-App</a>
           <div class="login-ver">Version ${VERSION}</div>
         </div>
       </main>`;
@@ -1661,6 +1664,7 @@
             <div class="header-sub">Helferplan</div>
           </div>
           <div class="header-right">
+            <a class="hbtn back-to-app" href=${BENDITO_APP} referrerpolicy="no-referrer">← Zur Bendito-App</a>
             ${isAdmin ? html`<div class="stat-pill"><span><b>${d.total.fil}</b>/${d.total.tot} belegt · <b>${d.total.pct}%</b></span></div>` : null}
             ${meHelper ? html`<div class="stat-pill"><span><b>${d.stats[me].c}</b>/${d.stats[me].tgt} Schichten</span></div>` : null}
             <div class=${'who ' + (isAdmin ? 'on-a' : 'on-h')}>${isAdmin ? 'Orga' : (meHelper ? meHelper.display_name : '')}</div>

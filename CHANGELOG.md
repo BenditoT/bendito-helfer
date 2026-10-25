@@ -1,5 +1,9 @@
 # Changelog
 
+## 5.0.7 — 2026-10-25
+
+„Zur Bendito-App“ führt aus allen Planansichten, der Anmeldung und Verbindungsmeldungen zurück zur Gäste-App. Der Link öffnet sich im selben Tab; die Helfer-Anmeldung bleibt erhalten.
+
 ## 5.0.6 — 2026-10-25
 
 „Mein Plan“ zeigt nur noch Schichten und Stunden, ohne Soll-Stunden. Schichten von 1 oder 2 Stunden sahen sonst aus wie zu viel oder zu wenig. Der Haken kommt, wenn die Soll-Schichten erreicht sind. Die Orga-Ansicht bleibt gleich.

@@ -87,3 +87,13 @@ begin
     execute 'grant execute on function public.hp_admin_list_help_offers() to authenticated';
   end if;
 end $$;
+
+-- Mail-RPCs aus 0009 bei einer späteren Rechte-Reparatur wiederherstellen.
+do $$
+begin
+  if to_regprocedure('public.hp_mail_claim(text,integer)') is not null then
+    grant execute on function public.hp_mail_claim(text,int), public.hp_mail_done(text,bigint[],boolean) to anon;
+    grant execute on function public.hp_admin_set_helper_mail(uuid,text), public.hp_admin_helper_mail_list(),
+      public.hp_my_mail_enabled(boolean), public.hp_admin_set_mail_secret_hash(text) to authenticated;
+  end if;
+end $$;

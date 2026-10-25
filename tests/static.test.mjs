@@ -92,7 +92,7 @@ test('config.js und CSP zeigen auf dasselbe Projekt; nur der anon-Schlüssel', (
     const hosted = /^https:\/\/[a-z0-9]{20}\.supabase\.co$/;
     const ownHost = /^https:\/\/[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/;
     assert.ok(hosted.test(url) || ownHost.test(url), 'Adresse ist kein erlaubter Hostname');
-    assert.equal(connect.trim(), url);
+    assert.deepEqual(connect.trim().split(/\s+/), ["'self'", url]);
     if (key.startsWith('eyJ')) {
       assert.equal(JSON.parse(Buffer.from(key.split('.')[1], 'base64url').toString('utf8')).role, 'anon');
     } else {
@@ -134,12 +134,14 @@ test('app.js: dangerouslySetInnerHTML nur an den zwei bekannten Stellen mit fest
 test('app.js: im Browser bleiben nur Sitzung und Anzeige-Vorlieben', () => {
   const js = read('app.js');
   const keys = [...js.matchAll(/localStorage\.(?:setItem|getItem)\(\s*'([^']+)'/g)].map((m) => m[1]);
-  assert.deepEqual([...new Set(keys)], ['hp-prefs']);
-  assert.ok(!/sessionStorage|indexedDB|document\.cookie/.test(js), 'weiterer Speicher im Browser');
+  assert.deepEqual([...new Set(keys)], ['hp-prefs', 'kb-team-pass']);
+  const sessionKeys=[...js.matchAll(/sessionStorage\.(?:setItem|getItem)\(\s*'([^']+)'/g)].map(m=>m[1]);
+  assert.deepEqual([...new Set(sessionKeys)], ['hp-seen-version']);
+  assert.ok(!/indexedDB|document\.cookie/.test(js), 'weiterer Speicher im Browser');
   assert.match(js, /storageKey: 'hp-auth'/);
   // Kein Abruf an fremde Adressen: fetch nur zur Edge Function des eigenen Projekts.
   const fetches = [...js.matchAll(/fetch\(([^,)]+)/g)].map((m) => m[1].trim());
-  assert.deepEqual(fetches, ["CFG.supabaseUrl + '/functions/v1/hp-login'"]);
+  assert.deepEqual(fetches, ["CFG.supabaseUrl + '/functions/v1/hp-login'", "CFG.supabaseUrl + '/rest/v1/rpc/kb_team'", "'config.js?_=' + Date.now("]);
   assert.ok(!/https?:\/\/[a-z0-9]/i.test(js), 'feste Adresse im Code');
 });
 
@@ -162,7 +164,12 @@ test('Migrationen: jede Funktion mit leerem search_path, keine offene Policy', (
   for (const f of readdirSync(path.join(root, dir)).sort()) {
     const sql = read(path.join(dir, f));
     assert.ok(!/using\s*\(\s*true\s*\)/i.test(sql), f + ': offene Policy');
-    assert.ok(!/grant\s+[^;]*\bto\s+(public|anon)\b/i.test(sql), f + ': Recht für anon oder public');
+    for (const grant of sql.matchAll(/grant\s+([^;]*?)\bto\s+(public|anon)\b[^;]*;/gi)) {
+      assert.equal(grant[2].toLowerCase(), 'anon', f + ': Recht für PUBLIC');
+      assert.match(grant[1], /^execute on function /i, f + ': anon bekommt Tabellen-/Schemarechte');
+      const names=[...grant[1].matchAll(/public\.(hp_\w+)\(/g)].map(x=>x[1]);
+      assert.deepEqual(names.sort(), ['hp_mail_claim','hp_mail_done'], f + ': nur geheimnisgeschützte Mail-RPCs für anon');
+    }
     for (const m of sql.matchAll(/create or replace function (public\.hp_\w+|hp_private\.\w+)\s*\(([\s\S]*?)\n\$\$;/g)) {
       fns += 1;
       assert.match(m[0], /set search_path = ''/, f + ': ' + m[1] + ' ohne festen search_path');
@@ -193,7 +200,7 @@ test('mithilfe.html: gleiche Sperre wie der Helferplan, nur die eigene Abfrage',
   const html = read('mithilfe.html');
   const m = html.match(/<meta http-equiv="Content-Security-Policy" content="([^"]+)"/);
   assert.ok(m, 'CSP fehlt');
-  assert.equal((m[1].match(/connect-src ([^;"]+)/) || [])[1].trim(), (read('index.html').match(/connect-src ([^;"]+)/) || [])[1].trim());
+  assert.equal((m[1].match(/connect-src ([^;"]+)/) || [])[1].trim(), (read('config.js').match(/supabaseUrl:\s*'([^']+)'/) || [])[1]);
   assert.ok(!/unsafe-inline|unsafe-eval|\*/.test(m[1]), 'CSP ist aufgeweicht');
   assert.ok(!/<script(?![^>]*\bsrc=)[^>]*>/.test(html), 'Inline-Skript gefunden');
   assert.ok(!/\son[a-z]+="/.test(html), 'Inline-Ereignis gefunden');
