@@ -1,5 +1,9 @@
 # Changelog
 
+## 5.0.6 — 2026-10-25
+
+„Mein Plan“ zeigt nur noch Schichten und Stunden, ohne Soll-Stunden. Schichten von 1 oder 2 Stunden sahen sonst aus wie zu viel oder zu wenig. Der Haken kommt, wenn die Soll-Schichten erreicht sind. Die Orga-Ansicht bleibt gleich.
+
 ## 5.0.5 — 2026-10-24
 
 Beim neuen Login-Link gibt es „Mail vorbereiten“. Das öffnet das eigene Mailprogramm mit dem Link im Text. Die App verschickt die Mail nicht.

@@ -1,5 +1,11 @@
 # HANDOVER – Bendito Helferplan
 
+## Mein Plan ohne Soll-Stunden (25.10.2026, 5.0.6, noch nicht live)
+
+Helfer sahen „9,5 h von 9 h“ (Sylvia) oder „8,5 h von 9 h“ ohne Haken (Claudia, Marita), obwohl alle 6 von 6 Schichten haben. Grund: Schichten von 1 oder 2 Stunden. „Mein Plan“ zeigt jetzt „6 Schichten · 9,5 h ✓“. Der Haken kommt, wenn die Soll-Schichten erreicht sind. Die Orga-Ansicht ist unverändert. Geändert: `app.js`, `config.js`, `index.html`, `CHANGELOG.md`, `README.md`. Geprüft: `node --check app.js`, Schranke `prepublish-check` grün. `tests/static.test.mjs` hat 3 Fehler. Sie sind älter als diese Änderung (CSP `'self'` aus 5.0.4, `kb-team-pass` aus 5.0.3, CSP von mithilfe.html) und nicht behoben. Nicht committed, weil git im Cowork-Ordner keine Lock-Dateien löschen kann. Mit dem Push gehen auch die 3 lokalen Commits davor raus (Schichtraster 2026, zwei Übergabe-Notizen).
+
+**Was Norbert jetzt tut:** Den Befehl aus dem Chat im Terminal ausführen (Commit und Push), dann nach etwa 10 Minuten im Helferplan prüfen, ob unten 5.0.6 steht.
+
 ## Orga-Login wieder erreichbar (24.10.2026, nachts)
 
 Die Anmeldung kam an, der Planabruf danach nicht. Der Browser schickt dafür die Köpfe `content-profile` und `prefer`. Die Gateway-Freigabe für `/rest/v1/` ließ sie nicht zu, also blieb der eigentliche Aufruf aus. Ergänzt in `lds.template.yaml` auf dem Server, nur die Route `rest-v1-protected`. Sicherung davor: `lds.template.yaml.vor-cors-profil-2026-10-24`. Neu gestartet nur `bendito-envoy`. Danach lässt der Browser den Aufruf durch und bekommt ohne Anmeldung die erwartete Ablehnung. Auth, Datenbank und die übrigen Bendito-Container liefen weiter. Norbert hat danach bestätigt: der Orga-Login geht.

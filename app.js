@@ -1,4 +1,4 @@
-/* Bendito Helferplan 5.0.5
+/* Bendito Helferplan 5.0.6
  *
  * Preact + htm ohne Build-Schritt. Alle Fachdaten liegen in der Datenbank und
  * kommen über hp_state(); geändert wird nur über die hp_-Funktionen. Im Browser
@@ -1163,7 +1163,7 @@
             <div class="me-av" style=${{backgroundColor: h.color}}></div>
             <div>
               <div class="me-nm">${h.display_name}</div>
-              <div class="me-sub">${s.c} von ${s.tgt} Schichten · ${hrs(s.min)} h von ${hrs(s.tgtMin)} h${s.min >= s.tgtMin ? ' ✓' : ''}</div>
+              <div class="me-sub">${s.c} ${s.c === 1 ? 'Schicht' : 'Schichten'} · ${hrs(s.min)} h${s.c >= s.tgt ? ' ✓' : ''}</div>
             </div>
           </div>
           ${locked ? html`<div class="notice warn" style=${{margin: '0 0 14px'}}><span>Der Tausch ist gesperrt. Wenn du eine Schicht nicht übernehmen kannst, melde dich direkt bei der Orga.</span></div>` : null}
