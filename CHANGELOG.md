@@ -1,3 +1,8 @@
+## 5.1.2 — 2026-10-29
+
+- Sichtbarer Gruß zum Jubiläum mit Erinnerung an das Teamtreffen am 30.10. um 15 Uhr, bis zum Beginn des Treffens.
+- Bitte um Rückmeldung bei Verhinderung und direkter Zugang zu den Anleitungen; Treffentexte entsprechend ergänzt.
+
 ## 5.1.1 – Antwortentwürfe für Mithilfe
 
 - Orga speichert Betreff, Antworttext und Bearbeitungsstand zentral je Helferangebot.

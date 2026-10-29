@@ -65,6 +65,11 @@ button:disabled { cursor: not-allowed; opacity: 0.45; }
 .notice.toast.info { background: #EEF6F1; }
 .notice button { background: none; border: 1px solid currentColor; color: inherit; border-radius: 6px; font-size: 12px; font-weight: 600; padding: 4px 10px; min-height: 32px; flex-shrink: 0; }
 
+.team-meeting { margin: 16px 20px; padding: 18px 20px; max-width: 900px; border: 1px solid #E8CF9B; border-radius: var(--radius); background: #FFF4DE; color: #4D350E; font-size: 14px; line-height: 1.6; }
+.team-meeting h2 { font-size: 18px; line-height: 1.35; margin-bottom: 10px; }
+.team-meeting p + p { margin-top: 10px; }
+.team-meeting-link { margin-top: 12px; padding: 10px 14px; min-height: 44px; border: 1px solid var(--gold-dark); border-radius: 6px; background: #fff; color: var(--gold-dark); font-size: 14px; font-weight: 600; }
+
 /* NAV */
 .nav { display: flex; padding: 0 28px; background: #fff; border-bottom: 1px solid var(--border); }
 .nav-d { flex: 1; padding: 12px 0 10px; min-height: 48px; text-align: center; border: none; background: none; color: var(--text2); font-size: 12px; font-weight: 500; transition: all 0.2s; border-bottom: 3px solid transparent; }

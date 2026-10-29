@@ -26,7 +26,7 @@
     aufbau: {n: 'Aufbau', info: 'Aufbau Donnerstag + Freitag: Bendito Banner aufhängen, rote Tischdecken auf kleine Tische, Tische dekorieren, Geschirr-Rückgabe vor dem Raum im Flur einrichten.'},
     helferessen: {n: 'Helferessen', info: 'Helferessen 19:30 Uhr. Tisch decken im Milongasaal, Getränke bereitstellen, nach dem Essen Geschirr abräumen, Reste in die Helferküche bringen.'},
     'fr-aufbau': {n: 'Freitag Aufbau', info: 'Freitag Aufbau: Saal vorbereiten, Kerzen und Blumen aufstellen, Beschilderung anbringen, Bar aufbauen im Buffet-Raum. Kühlschrank steht neben der Bar, Vorrat-Kisten unter dem Bartisch.'},
-    team: {n: 'Teamtreffen', info: 'Teamtreffen 15:00 Uhr!!! Alle Helfer kommen zusammen für die finale Besprechung.'},
+    team: {n: 'Teamtreffen', info: 'Freitag, 30.10.2026, um 15:00 Uhr: gemeinsamer Start ins Jubiläumswochenende! Bitte komm, wenn es dir möglich ist – wir möchten uns als Team kennenlernen und die letzten Fragen klären. Wenn du nicht dabei sein kannst, gib der Orga bitte kurz Bescheid. Lies in jedem Fall die Infos unter „Anleitungen“ gut durch: Dort stehen die Grundlagen für deine Mithilfe.'},
     checkin: {n: 'Check-In', info: 'Gäste empfangen, Namenslisten prüfen, Bändchen ausgeben. Stempelkarten Verkauf! Ab 20:30 Uhr Check-In an die Bar übergeben.'},
     sekt: {n: 'Sektempfang', info: 'Aufbau Sektempfang. Gläser bereitstellen, Sekt kühlen, Empfangsbereich dekorieren.'},
     bettw: {n: 'Bettwäsche', info: 'Bettwäsche hochbringen in die Schlafräume und verteilen.'},
@@ -48,7 +48,7 @@
     {title: 'Brunch-Service', icon: '☕', body: '<p><strong>Aufgaben:</strong></p><p>• Vorbereitung mit dem Küchenteam<br>• Buffet aufbauen und auffüllen<br>• Während des Brunchs: Service, Getränke, Nachschub<br>• Geschirr abräumen und zur Spülstation bringen</p>'},
     {title: 'Aufbau & Abbau', icon: '🔨', body: '<p><strong>Aufbau (Do + Fr):</strong></p><p>• Bendito Banner aufhängen<br>• Rote Tischdecken auf kleine Tische<br>• Tische dekorieren<br>• Geschirr-Rückgabe vor dem Raum im Flur einrichten<br>• Bar aufbauen im Buffet-Raum<br>• Kerzen und Blumen aufstellen</p><p><strong>Abbau (So):</strong></p><p>• 13:00 Schilder für Abbau aufhängen, Lagerstruktur beachten<br>• 14:00 Kerzen und Blumen einsammeln<br>• 15:00 Offizielles Verabschieden + Foto<br>• 15:30 Rückbau Yogazimmer<br>• Kerzenständer putzen, Blumen in Eimer mit Wasser<br>• Beschilderung abhängen, alles ins Lager!</p>'},
     {title: 'Küche & Spülen', icon: '🍳', body: '<p><strong>Küche:</strong></p><p>• 13:00 Helferküche putzen<br>• Vorbereitung für Mahlzeiten<br>• Spülmaschine bedienen</p><p><strong>Spülen:</strong></p><p>• Alles muss gespült und ins Lager gebracht werden<br>• Gläser, Töpfe, Besteck</p>'},
-    {title: 'Allgemeine Hinweise', icon: 'ℹ️', body: '<p>• <strong>Hygiene im Bad:</strong> Seife, Toilettenpapier, Desinfektionsmittel, Spiegel, Raumduft, Haarspray, Deo, Kaugummi, Tampons bereitstellen</p><p>• <strong>Helferessen:</strong> Donnerstag 19:30 Uhr</p><p>• <strong>Teamtreffen:</strong> Freitag 15:00 – alle müssen da sein!</p><p>• Bei Problemen oder Materialmangel: Rücksprache im Team – die erfahrenen Hasen wissen was zu tun ist.</p>'}
+    {title: 'Allgemeine Hinweise', icon: 'ℹ️', body: '<p>• <strong>Hygiene im Bad:</strong> Seife, Toilettenpapier, Desinfektionsmittel, Spiegel, Raumduft, Haarspray, Deo, Kaugummi, Tampons bereitstellen</p><p>• <strong>Helferessen:</strong> Donnerstag 19:30 Uhr</p><p>• <strong>Teamtreffen:</strong> Freitag, 30.10.2026, um 15:00 Uhr. Bitte komm, wenn möglich – das Kennenlernen im Team ist uns wichtig! Wenn du nicht dabei sein kannst, gib der Orga bitte kurz Bescheid.</p><p>• <strong>Bitte lies alle Infos unter „Anleitungen“ gut durch:</strong> Hier stehen die Grundlagen für deine Mithilfe, auch wenn du beim Treffen nicht dabei sein kannst.</p><p>• Bei Problemen oder Materialmangel: Rücksprache im Team – die erfahrenen Hasen wissen was zu tun ist.</p>'}
   ];
 
   var DAYS = [
@@ -1768,6 +1768,13 @@
           <span class="dot" aria-hidden="true"></span><span>${statusText}</span>
           ${conn.ok ? null : html`<button type="button" class="status-btn" onClick=${function () { refresh(); }}>Erneut versuchen</button>`}
         </div>
+        ${d.serverNow < new Date('2026-10-30T15:00:00+01:00') ? html`<section class="team-meeting" aria-labelledby="team-meeting-title">
+          <h2 id="team-meeting-title">💛 Teamtreffen · Freitag, 30.10., 15 Uhr</h2>
+          <p>Ihr Lieben, hier ist es herbstlich sonnig, und mit jedem Handgriff wächst die Vorfreude – und ein bisschen aufgeregt sind wir auch! Zehn Jahre Bendito: Wie schön, diese Jubiläumsedition mit euch zu gestalten. Danke, dass ihr eure Zeit, Energie und euer Herz mitbringt.</p>
+          <p>Bitte kommt am Freitag um <strong>15 Uhr zum Teamtreffen</strong>, wenn es euch möglich ist. Wir möchten uns kennenlernen, gemeinsam starten und die letzten Fragen klären. <strong>Wenn du nicht dabei sein kannst, gib uns bitte kurz Bescheid.</strong></p>
+          <p>Lies bitte in jedem Fall die Infos unter <strong>„Anleitungen“</strong> gut durch – dort stehen die Grundlagen für deine Mithilfe. Wir freuen uns auf euch! Un abrazo, Norbert und das Bendito-Team</p>
+          <button type="button" class="team-meeting-link" onClick=${function () { setView('howto'); }}>Anleitungen lesen →</button>
+        </section>` : null}
         ${reminder ? html`<div class="notice warn" data-reminder="1"><span>${reminder}</span>
           ${cur === 'settings' ? null : html`<button type="button" onClick=${function () { setView('settings'); }}>Zu den Einstellungen</button>`}</div>` : null}
         <nav class="nav" aria-label="Tage">
