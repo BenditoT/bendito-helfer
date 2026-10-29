@@ -1,3 +1,9 @@
+## 5.1.1 – Antwortentwürfe für Mithilfe
+
+- Orga speichert Betreff, Antworttext und Bearbeitungsstand zentral je Helferangebot.
+- Mailprogramm mit vorbereitetem Text öffnen; kein Versand aus der App.
+- Schutz vor gleichzeitigem Überschreiben, Zugriff nur für Orga.
+
 # Changelog
 
 ## 5.1.0 — 2026-10-25

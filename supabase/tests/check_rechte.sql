@@ -27,7 +27,7 @@ soll_auth(label) as (values
   ('hp_admin_assign'), ('hp_admin_unassign'), ('hp_admin_upsert_helper'), ('hp_admin_add_helpers'),
   ('hp_admin_deactivate_helper'), ('hp_admin_reactivate_helper'), ('hp_admin_set_setting'),
   ('hp_admin_remove_test_data'), ('hp_admin_purge'), ('hp_admin_new_login_code'), ('hp_admin_revoke_login'),
-  ('hp_admin_list_help_offers'), ('hp_admin_set_helper_mail'), ('hp_admin_helper_mail_list'),
+  ('hp_admin_list_help_offers'), ('hp_admin_save_offer_reply'), ('hp_admin_set_helper_mail'), ('hp_admin_helper_mail_list'),
   ('hp_my_mail_enabled'), ('hp_admin_set_mail_secret_hash')
 ),
 soll_anon(label) as (values ('hp_mail_claim'), ('hp_mail_done')),
@@ -77,9 +77,9 @@ select 4, 'Funktionen ohne Anmeldung ausführbar', 'nur Mail-Claim und Done',
        (select coalesce(string_agg(txt, ', ' order by txt), 'nur Mail-Claim und Done') from abw_anon),
        (select count(*) = 0 from abw_anon)
 union all
-select 5, 'Funktionen für angemeldete Konten', 'genau die 23 der App',
-       (select coalesce(string_agg(txt, ', ' order by txt), 'genau die 23 der App') from abw_auth),
-       (select count(*) = 0 from abw_auth) and (select count(*) = 23 from ist_auth)
+select 5, 'Funktionen für angemeldete Konten', 'genau die 24 der App',
+       (select coalesce(string_agg(txt, ', ' order by txt), 'genau die 24 der App') from abw_auth),
+       (select count(*) = 0 from abw_auth) and (select count(*) = 24 from ist_auth)
 union all
 select 6, 'Funktionen für die Edge Functions', 'Login und Mithilfe-Abfrage',
        (select coalesce(string_agg(txt, ', ' order by txt), 'Login und Mithilfe-Abfrage') from abw_svc),

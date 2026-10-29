@@ -479,6 +479,43 @@
       </form>`;
   }
 
+  function OfferReply(props) {
+    var o = props.offer;
+    var [subject, setSubject] = useState(o.reply_subject || 'Bendito – deine Mithilfe');
+    var [body, setBody] = useState(o.reply_body || '');
+    var [status, setStatus] = useState(o.reply_status || 'open');
+    var [revision, setRevision] = useState(o.reply_revision || 0);
+    var [busy, setBusy] = useState(false);
+    var [message, setMessage] = useState('');
+    var [saved, setSaved] = useState(true);
+    function save(e) {
+      e.preventDefault(); setBusy(true); setMessage('');
+      rpc('hp_admin_save_offer_reply', {p_id: o.id, p_subject: subject, p_body: body,
+        p_status: status, p_revision: revision}).then(function (r) {
+        if (!r.ok) { setMessage(r.code === 'CONFLICT' ? 'Inzwischen geändert. Bitte neu laden; dein Text bleibt hier erhalten.' : 'Bitte Eingaben prüfen.'); return; }
+        setRevision(r.revision); setSaved(true); setMessage('Gespeichert. Es wurde keine Nachricht versendet.');
+      }, function () { setMessage('Speichern fehlgeschlagen. Dein Text bleibt hier erhalten; bitte erneut versuchen.'); })
+        .finally(function () { setBusy(false); });
+    }
+    return html`<form onSubmit=${save}>
+      <h4>Antwort vorbereiten</h4>
+      <div class="field"><label for=${'reply-subject-' + o.id}>Betreff</label>
+        <input id=${'reply-subject-' + o.id} maxlength="200" value=${subject} disabled=${busy} onInput=${function (e) { setSubject(e.target.value); setSaved(false); }} /></div>
+      <div class="field"><label for=${'reply-body-' + o.id}>Antwortentwurf</label>
+        <textarea id=${'reply-body-' + o.id} rows="5" maxlength="5000" value=${body} disabled=${busy} onInput=${function (e) { setBody(e.target.value); setSaved(false); }}></textarea></div>
+      <div class="field"><label for=${'reply-status-' + o.id}>Bearbeitungsstand</label>
+        <select id=${'reply-status-' + o.id} value=${status} disabled=${busy} onChange=${function (e) { setStatus(e.target.value); setSaved(false); }}>
+          <option value="open">Offen</option><option value="draft">Entwurf</option>
+          <option value="done">Erledigt / anderweitig beantwortet</option><option value="no_reply">Keine Nachricht nötig</option>
+        </select></div>
+      <div class="btn-row"><button class="btn btn-gold" type="submit" disabled=${busy}>${busy ? 'Speichert …' : 'Entwurf und Stand speichern'}</button>
+        ${saved && body ? html`<a class="btn btn-ghost" href=${'mailto:' + encodeURIComponent(o.email) + '?subject=' + encodeURIComponent(subject) + '&body=' + encodeURIComponent(body)}>Im Mailprogramm öffnen</a>` : null}
+      </div>
+      <p class="mini-sub">${saved ? 'Die App versendet keine E-Mails. Im Mailprogramm selbst prüfen und versenden.' : 'Ungespeicherte Änderungen.'}</p>
+      ${message ? html`<p role="status">${message}</p>` : null}
+    </form>`;
+  }
+
   // Private addresses are write-only and never kept in the plan or browser storage.
   function HelperMail(props) {
     var [status, setStatus] = useState(null);
@@ -1645,9 +1682,9 @@
         </div>
         ${offersErr ? html`<p class="empty-msg">${offersErr}</p>` : null}
         ${!offersErr && offers && rows.length === 0 ? html`<p class="empty-msg">Noch keine Rückmeldung.</p>` : null}
-        ${rows.map(function (o) {
+        ${rows.map(function (o, index) {
           return html`<article class="offer-card" key=${o.email}>
-            <h3>${o.name}</h3>
+            <h3>${index + 1}. ${o.name}</h3>
             <div class="mini-sub">${o.email}${o.phone ? ' · ' + o.phone : ''} · ${fmtDT(o.updated_at)}</div>
             <ul>
               <li>${line('Donnerstag, 29.10.', o.arrive_thu)}</li>
@@ -1656,6 +1693,7 @@
               <li>${line('Abschlussessen Sonntag', o.dinner_sun)}</li>
             </ul>
             ${o.note ? html`<p>${o.note}</p>` : null}
+            ${o.id ? html`<${OfferReply} key=${o.id + ':' + (o.reply_revision || 0)} offer=${o} />` : null}
           </article>`;
         })}
       </div>`;

@@ -4,7 +4,7 @@
 // Content-Security-Policy in index.html. Solange beides leer ist, zeigt die App
 // „Die Datenbank ist noch nicht verbunden.“
 window.HP_CONFIG = {
-  version: '5.1.0',
+  version: '5.1.1',
   benditoAppUrl: 'https://db.benditotango.de/app/',
   supabaseUrl: 'https://db.benditotango.de',
   supabaseAnonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlzcyI6InN1cGFiYXNlIiwiaWF0IjoxNzkyMTQwMTMxLCJleHAiOjIxMDc1MDAxMzF9.PRh_r-UX8bVxGWfRS6secrs7IYRiD3Avmcj_smdqM2E'

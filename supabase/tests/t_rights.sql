@@ -31,7 +31,7 @@ declare
     'hp_admin_upsert_helper(uuid,text,text,text,boolean,integer,boolean)', 'hp_admin_add_helpers(text[],boolean)',
     'hp_admin_deactivate_helper(uuid,boolean)', 'hp_admin_reactivate_helper(uuid)',
     'hp_admin_set_setting(text,jsonb)', 'hp_admin_remove_test_data()', 'hp_admin_purge(text)',
-    'hp_admin_new_login_code(uuid)', 'hp_admin_revoke_login(uuid)', 'hp_admin_list_help_offers()',
+    'hp_admin_new_login_code(uuid)', 'hp_admin_revoke_login(uuid)', 'hp_admin_list_help_offers()', 'hp_admin_save_offer_reply(uuid,text,text,text,integer)',
     'hp_admin_set_helper_mail(uuid,text)', 'hp_admin_helper_mail_list()',
     'hp_my_mail_enabled(boolean)', 'hp_admin_set_mail_secret_hash(text)'];
   res jsonb := '[]'::jsonb;

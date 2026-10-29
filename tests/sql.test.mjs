@@ -129,12 +129,12 @@ test('check_rechte.sql: frisch alles in Ordnung, jede Abweichung wird gemeldet',
       rollback;
     `);
     assert.equal(out.status, 0, out.stderr);
-    const rows = out.stdout.split('\n').filter((l) => /^\d\t/.test(l)).map((l) => l.split('\t'));
-    assert.equal(rows.length, 8, out.stdout);
+    const rows = out.stdout.split('\n').filter((l) => /^\d+\t/.test(l)).map((l) => l.split('\t'));
+    assert.equal(rows.length, 10, out.stdout);
     return Object.fromEntries(rows.map((r) => [r[0], r[4] === 't']));
   };
   const allOk = run('');
-  assert.deepEqual(Object.values(allOk), Array(8).fill(true), JSON.stringify(allOk));
+  assert.deepEqual(Object.values(allOk), Array(10).fill(true), JSON.stringify(allOk));
   const bad = (prepare) => Object.entries(run(prepare)).filter(([, ok]) => !ok).map(([nr]) => nr).join(',');
   assert.equal(bad('alter table public.hp_audit disable row level security;'), '1');
   assert.equal(bad('drop policy hp_no_client on public.hp_swaps; create policy offen on public.hp_swaps for select to authenticated using (true);'), '2');
@@ -148,7 +148,7 @@ test('check_rechte.sql: frisch alles in Ordnung, jede Abweichung wird gemeldet',
   assert.equal(bad('alter function public.hp_state() reset search_path;'), '8');
   // Das, was eine andere Anwendung im selben Projekt pauschal anrichten könnte.
   assert.equal(bad('grant execute on all functions in schema public to anon, authenticated;'), '4,5');
-  assert.equal(bad('revoke execute on all functions in schema public from anon, authenticated, service_role;'), '5,6');
+  assert.equal(bad('revoke execute on all functions in schema public from anon, authenticated, service_role;'), '4,5,6');
   // Die Prüfung selbst ändert nichts.
   const after = run('');
   assert.deepEqual(after, allOk);
